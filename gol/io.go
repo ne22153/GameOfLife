@@ -91,10 +91,11 @@ func (io *ioState) readPgmImage() {
 
 	// Request a filename from the distributor.
 	filename := <-io.channels.filename
+	fmt.Println(filename)
 
 	data, ioError := ioutil.ReadFile("images/" + filename + ".pgm")
 	util.Check(ioError)
-
+	fmt.Println("File read")
 	fields := strings.Fields(string(data))
 
 	if fields[0] != "P5" {
@@ -119,7 +120,9 @@ func (io *ioState) readPgmImage() {
 	image := []byte(fields[4])
 
 	for _, b := range image {
+		//fmt.Println("Put in")
 		io.channels.input <- b
+		//fmt.Println("Taken out")
 	}
 
 	fmt.Println("File", filename, "input done!")
@@ -138,6 +141,7 @@ func startIo(p Params, c ioChannels) {
 		case command := <-io.channels.command:
 			switch command {
 			case ioInput:
+				fmt.Println("Input triggered")
 				io.readPgmImage()
 			case ioOutput:
 				io.writePgmImage()
