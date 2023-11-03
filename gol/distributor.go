@@ -97,8 +97,9 @@ func populateNeighboursList(inputWorld [][]byte, prevRow, row, nextRow []byte, e
 	return neighboursList
 }
 
-func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte, wg *sync.WaitGroup) {
+func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte, wg *sync.WaitGroup, j int) {
 	gameSlice := worker(imageHeight, imageWidth, inputWorld)
+	fmt.Println(j, ": Input game: ", inputWorld, "\n Output game: ", gameSlice)
 	out <- gameSlice
 	defer wg.Done()
 }
@@ -146,8 +147,6 @@ func worker(imageHeight int, imageWidth int, inputWorld [][]byte) [][]byte {
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
 
-	// TODO: Create a 2D slice to store the world.
-
 	var turn int = 0
 
 	//We create the worlds
@@ -178,7 +177,7 @@ func distributor(p Params, c distributorChannels) {
 	//16 div 5 = 3.2, ceil is 4
 	//
 	var stripSizeInt int = int(StripSize)
-	//We reduce the stripsize by one if it the strips are one more than needed
+	//We reduce the strip size by one if the strips are one more than needed
 	if (stripSizeInt*p.Threads)-p.ImageHeight == stripSizeInt {
 		StripSize = StripSize - 1
 	}
@@ -227,37 +226,14 @@ func distributor(p Params, c distributorChannels) {
 					strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:endIndex]...)
 				}
 
-				//else {
-				//
-				//	startIndex = j*int(StripSize) - 1
-				//	midIndex = j * int(StripSize)
-				//
-				//	//If it's the final thread, it should have the first line at [StripSize-1]
-				//	if j == p.Threads-1 {
-				//		endIndex = 0
-				//		strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:p.ImageHeight]...)
-				//
-				//		//Fill out any remainder space on the last strip
-				//		StripSize = float64(p.ImageHeight - startIndex - 1)
-				//
-				//		//If it's a strip in the middle
-				//	} else {
-				//
-				//		//Bruh this is the section that fails
-				//		endIndex = (j+1)*int(StripSize) - 1
-				//		strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:endIndex+1]...)
-				//
-				//	}
-				//}
-
 				//Add on the last line
 				strip = append(strip, inputWorld[endIndex])
 
-				fmt.Println("Bruh this is the size of the strip", len(strip), "adjusted: ", len(strip)-2)
+				//fmt.Println("Bruh this is the size of the strip", len(strip), "adjusted: ", len(strip)-2)
 
-				fmt.Println(StripSize, strip)
+				//fmt.Println(StripSize, strip)
 				//Pass the strip to the manager goroutine to process
-				go manager(int(StripSize)+2, p.ImageWidth, strip, genSlice[j], &wg)
+				go manager(int(StripSize)+2, p.ImageWidth, strip, genSlice[j], &wg, j)
 			}
 			//Wait until all strips are finished running
 			wg.Wait()
