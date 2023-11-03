@@ -108,6 +108,8 @@ func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- []
 	for i := 0; i < len(inputWorld); i++ {
 		fmt.Println(gameSlice[i])
 	}
+
+	fmt.Println()
 	//fmt.Println(j, ": Input game: ", inputWorld, "\n Output game: ", gameSlice)
 	out <- gameSlice
 	defer wg.Done()
