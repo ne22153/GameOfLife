@@ -98,14 +98,14 @@ func populateNeighboursList(inputWorld [][]byte, prevRow, row, nextRow []byte, e
 }
 
 func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte, wg *sync.WaitGroup, j int) {
-	gameSlice := worker(imageHeight, imageWidth, inputWorld)
+	gameSlice := worker(imageHeight, imageWidth, inputWorld, j)
 	fmt.Println(j, ": Input game: ", inputWorld, "\n Output game: ", gameSlice)
 	out <- gameSlice
 	defer wg.Done()
 }
 
 //Perform the game of life algorithm
-func worker(imageHeight int, imageWidth int, inputWorld [][]byte) [][]byte {
+func worker(imageHeight int, imageWidth int, inputWorld [][]byte, j int) [][]byte {
 
 	//Create the result world
 	updatedWorld := make([][]byte, imageHeight)
@@ -174,20 +174,25 @@ func distributor(p Params, c distributorChannels) {
 
 	//Finds the appropriate size to be passed to each worker
 	StripSize := math.Ceil(float64(p.ImageHeight) / float64(p.Threads))
+	var StripArray = make([]float64, p.Threads)
 	//16 div 5 = 3.2, ceil is 4
 	//
 	var stripSizeInt int = int(StripSize)
 	//We reduce the strip size by one if the strips are one more than needed
 	if (stripSizeInt*p.Threads)-p.ImageHeight == stripSizeInt {
 		StripSize = StripSize - 1
+		fmt.Println("Trig ", StripSize)
 	}
-
+	for i := 0; i < p.Threads; i++ {
+		StripArray[i] = StripSize
+	}
+	fmt.Println(StripArray)
 	//Run the game of life algorithm for specified number of turns
 	for i := 0; i < p.Turns; i++ {
 		var newWorld [][]byte
 		//If there's only one worker, run as normal without the manager
 		if p.Threads == 1 {
-			newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
+			newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld, 1)
 		} else {
 			//If there's more than one worker, set up a wait group and comms channels for each strip
 			var wg sync.WaitGroup
@@ -208,20 +213,20 @@ func distributor(p Params, c distributorChannels) {
 					//Set the start index as the last row on the board
 					startIndex = p.ImageHeight - 1
 					midIndex = 0
-					endIndex = (j + 1) * int(StripSize)
+					endIndex = (j + 1) * int(StripArray[j])
 					strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:endIndex]...)
 				} else if j == p.Threads-1 {
-					startIndex = j*int(StripSize) - 1
-					midIndex = j * int(StripSize)
+					startIndex = j*int(StripArray[j]) - 1
+					midIndex = j * int(StripArray[j])
 					endIndex = 0
 
 					strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:p.ImageHeight]...)
 					//Fill out any remainder space on the last strip
-					StripSize = float64(p.ImageHeight - startIndex - 1)
+					StripArray[j] = float64(p.ImageHeight - startIndex - 1)
 				} else { //Middle of the strip
-					startIndex = j*int(StripSize) - 1
-					midIndex = j * int(StripSize)
-					endIndex = (j + 1) * int(StripSize)
+					startIndex = j*int(StripArray[j]) - 1
+					midIndex = j * int(StripArray[j])
+					endIndex = (j + 1) * int(StripArray[j])
 
 					strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:endIndex]...)
 				}
@@ -233,20 +238,26 @@ func distributor(p Params, c distributorChannels) {
 
 				//fmt.Println(StripSize, strip)
 				//Pass the strip to the manager goroutine to process
-				go manager(int(StripSize)+2, p.ImageWidth, strip, genSlice[j], &wg, j)
+				go manager(int(StripArray[j])+2, p.ImageWidth, strip, genSlice[j], &wg, j)
 			}
 			//Wait until all strips are finished running
 			wg.Wait()
 
 			//Go through the channels and read the updated strips into the new world
+			//fmt.Println(StripSize)
+			var count = 0
 			for _, element := range genSlice {
 				var i = 0
 				for _, line := range <-element {
-					if i != 0 && i != int(StripSize+1) {
+					if i != 0 && i != int(StripArray[count]+1) {
+						fmt.Println(count, line)
 						newWorld = append(newWorld, line)
+					} else {
+						fmt.Println("Skipped")
 					}
 					i++
 				}
+				count++
 			}
 		}
 		inputWorld = newWorld
