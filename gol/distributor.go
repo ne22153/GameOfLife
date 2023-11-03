@@ -128,6 +128,8 @@ func worker(imageHeight int, imageWidth int, inputWorld [][]byte, count int) [][
 			//populate a list of neighbors of the tile
 			var neighboursList []byte = populateNeighboursList(inputWorld, prevRow, row, nextRow, edge, j)
 
+			//fmt.Println("number of neighbours", len(neighboursList)) //must always be 8
+
 			//Find number of adjacent tiles that are alive
 			var adjacentAliveCells int = 0
 			for _, value := range neighboursList {
@@ -137,13 +139,17 @@ func worker(imageHeight int, imageWidth int, inputWorld [][]byte, count int) [][
 			}
 			var placeHolder = updateUpdatedWorldTile(tile, updatedWorld[i][j], adjacentAliveCells)
 			updatedWorld[i][j] = placeHolder
-			if placeHolder == LIVE {
-				fmt.Println(count, ":", j, i)
-			}
+			//if placeHolder == LIVE {
+			//	fmt.Println(count, ":", j, i)
+			//}
 
 		}
 	}
 
+	for i := 1; i < len(updatedWorld)-1; i++ {
+		fmt.Println(inputWorld[i], "         ", updatedWorld[i])
+	}
+	//fmt.Print(" end of strip \n")
 	return updatedWorld
 }
 
