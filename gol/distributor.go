@@ -175,6 +175,13 @@ func distributor(p Params, c distributorChannels) {
 
 	//Finds the appropriate size to be passed to each worker
 	StripSize := math.Ceil(float64(p.ImageHeight) / float64(p.Threads))
+	//16 div 5 = 3.2, ceil is 4
+	//
+	var stripSizeInt int = int(StripSize)
+	//We reduce the stripsize by one if it the strips are one more than needed
+	if (stripSizeInt*p.Threads)-p.ImageHeight == stripSizeInt {
+		StripSize = StripSize - 1
+	}
 
 	//Run the game of life algorithm for specified number of turns
 	for i := 0; i < p.Turns; i++ {
@@ -199,29 +206,55 @@ func distributor(p Params, c distributorChannels) {
 				var strip [][]byte
 				//If it's the first thread, it should have the last line at [0]
 				if j == 0 {
+					//Set the start index as the last row on the board
 					startIndex = p.ImageHeight - 1
 					midIndex = 0
 					endIndex = (j + 1) * int(StripSize)
 					strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:endIndex]...)
-				} else {
+				} else if j == p.Threads-1 {
 					startIndex = j*int(StripSize) - 1
 					midIndex = j * int(StripSize)
-					//If it's the final thread, it should have the first line at [StripSize-1]
-					if j == p.Threads-1 {
-						endIndex = 0
-						strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:p.ImageHeight]...)
-						StripSize = float64(p.ImageHeight - startIndex - 1)
-					} else {
+					endIndex = 0
 
-						//Bruh this is the section that fails
-						endIndex = (j+1)*int(StripSize) + 1
-						strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:endIndex-1]...)
-						if endIndex == p.ImageHeight-1 {
-							endIndex = 0
-						}
-					}
+					strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:p.ImageHeight]...)
+					//Fill out any remainder space on the last strip
+					StripSize = float64(p.ImageHeight - startIndex - 1)
+				} else { //Middle of the strip
+					startIndex = j*int(StripSize) - 1
+					midIndex = j * int(StripSize)
+					endIndex = (j + 1) * int(StripSize)
+
+					strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:endIndex]...)
 				}
+
+				//else {
+				//
+				//	startIndex = j*int(StripSize) - 1
+				//	midIndex = j * int(StripSize)
+				//
+				//	//If it's the final thread, it should have the first line at [StripSize-1]
+				//	if j == p.Threads-1 {
+				//		endIndex = 0
+				//		strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:p.ImageHeight]...)
+				//
+				//		//Fill out any remainder space on the last strip
+				//		StripSize = float64(p.ImageHeight - startIndex - 1)
+				//
+				//		//If it's a strip in the middle
+				//	} else {
+				//
+				//		//Bruh this is the section that fails
+				//		endIndex = (j+1)*int(StripSize) - 1
+				//		strip = append([][]byte{inputWorld[startIndex]}, inputWorld[midIndex:endIndex+1]...)
+				//
+				//	}
+				//}
+
+				//Add on the last line
 				strip = append(strip, inputWorld[endIndex])
+
+				fmt.Println("Bruh this is the size of the strip", len(strip), "adjusted: ", len(strip)-2)
+
 				fmt.Println(StripSize, strip)
 				//Pass the strip to the manager goroutine to process
 				go manager(int(StripSize)+2, p.ImageWidth, strip, genSlice[j], &wg)
