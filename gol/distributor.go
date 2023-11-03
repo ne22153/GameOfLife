@@ -1,6 +1,7 @@
 package gol
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -178,30 +179,34 @@ func distributor(p Params, c distributorChannels) {
 	//Run the game of life algorithm for specified number of turns
 	for i := 0; i < p.Turns; i++ {
 		var newWorld [][]uint8
+		//If there's only one worker, run as normal without the manager
 		if p.Threads == 1 {
 			newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
 		} else {
+			//If there's more than one worker, set up a wait group and comms channels for each strip
 			var wg sync.WaitGroup
 			var genSlice []chan [][]uint8
 			for j := 0; j < p.Threads; j++ {
 				newSlice := make(chan [][]uint8, 2)
 				genSlice = append(genSlice, newSlice)
 			}
+			//For each thread, split the input world and pass it to the manager goroutine
 			for j := 0; j < p.Threads; j++ {
 				wg.Add(1)
 				var startIndex int
 				var midIndex int
 				var endIndex int
 				var strip [][]uint8
+				//If it's the first thread, it should have the last line at [0]
 				if j == 0 {
 					startIndex = p.ImageHeight - 1
 					midIndex = 0
-					endIndex = (j+1)*int(StripSize) + 1
-					strip = append([][]uint8{inputWorld[startIndex]}, inputWorld[midIndex:endIndex-1]...)
-					//StripSize += 2
+					endIndex = (j + 1) * int(StripSize)
+					strip = append([][]uint8{inputWorld[startIndex]}, inputWorld[midIndex:endIndex]...)
 				} else {
 					startIndex = j*int(StripSize) - 1
 					midIndex = j * int(StripSize)
+					//If it's the final thread, it should have the first line at [StripSize-1]
 					if j == p.Threads-1 {
 						//fmt.Println("hi")
 						endIndex = 0
@@ -210,14 +215,20 @@ func distributor(p Params, c distributorChannels) {
 					} else {
 						endIndex = (j+1)*int(StripSize) + 1
 						strip = append([][]uint8{inputWorld[startIndex]}, inputWorld[midIndex:endIndex-1]...)
+						if endIndex == p.ImageHeight-1 {
+							endIndex = 0
+						}
 					}
 				}
 				strip = append(strip, inputWorld[endIndex])
-				//fmt.Println(StripSize, strip)
+				fmt.Println(StripSize, strip)
+				//Pass the strip to the manager goroutine to process
 				go manager(int(StripSize)+2, p.ImageWidth, strip, genSlice[j], &wg)
 			}
+			//Wait until all strips are finished running
 			wg.Wait()
 
+			//Go through the channels and read the updated strips into the new world
 			for _, element := range genSlice {
 				var i = 0
 				for _, line := range <-element {
