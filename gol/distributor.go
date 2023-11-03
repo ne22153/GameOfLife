@@ -99,7 +99,16 @@ func populateNeighboursList(inputWorld [][]byte, prevRow, row, nextRow []byte, e
 
 func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte, wg *sync.WaitGroup, j int) {
 	gameSlice := worker(imageHeight, imageWidth, inputWorld)
-	fmt.Println(j, ": Input game: ", inputWorld, "\n Output game: ", gameSlice)
+
+	fmt.Println("Input Game:")
+	for i := 0; i < len(inputWorld); i++ {
+		fmt.Println(inputWorld[i])
+	}
+	fmt.Println("Output Game:")
+	for i := 0; i < len(inputWorld); i++ {
+		fmt.Println(gameSlice[i])
+	}
+	//fmt.Println(j, ": Input game: ", inputWorld, "\n Output game: ", gameSlice)
 	out <- gameSlice
 	defer wg.Done()
 }
