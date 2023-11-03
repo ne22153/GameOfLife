@@ -99,13 +99,13 @@ func populateNeighboursList(inputWorld [][]byte, prevRow, row, nextRow []byte, e
 
 func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte, wg *sync.WaitGroup, j int) {
 	gameSlice := worker(imageHeight, imageWidth, inputWorld, j)
-	fmt.Println(j, ": Input game: ", inputWorld, "\n Output game: ", gameSlice)
+	//fmt.Println(j, ": Input game: ", inputWorld, "\n Output game: ", gameSlice)
 	out <- gameSlice
 	defer wg.Done()
 }
 
 //Perform the game of life algorithm
-func worker(imageHeight int, imageWidth int, inputWorld [][]byte, j int) [][]byte {
+func worker(imageHeight int, imageWidth int, inputWorld [][]byte, count int) [][]byte {
 
 	//Create the result world
 	updatedWorld := make([][]byte, imageHeight)
@@ -135,8 +135,11 @@ func worker(imageHeight int, imageWidth int, inputWorld [][]byte, j int) [][]byt
 					adjacentAliveCells++
 				}
 			}
-
-			updatedWorld[i][j] = updateUpdatedWorldTile(tile, updatedWorld[i][j], adjacentAliveCells)
+			var placeHolder = updateUpdatedWorldTile(tile, updatedWorld[i][j], adjacentAliveCells)
+			updatedWorld[i][j] = placeHolder
+			if placeHolder == LIVE {
+				fmt.Println(count, ":", j, i)
+			}
 
 		}
 	}
@@ -244,16 +247,16 @@ func distributor(p Params, c distributorChannels) {
 			wg.Wait()
 
 			//Go through the channels and read the updated strips into the new world
-			//fmt.Println(StripSize)
+			fmt.Println(StripArray)
 			var count = 0
 			for _, element := range genSlice {
 				var i = 0
 				for _, line := range <-element {
 					if i != 0 && i != int(StripArray[count]+1) {
-						fmt.Println(count, line)
+						//fmt.Println(count, line)
 						newWorld = append(newWorld, line)
 					} else {
-						fmt.Println("Skipped")
+						//fmt.Println("Skipped")
 					}
 					i++
 				}
