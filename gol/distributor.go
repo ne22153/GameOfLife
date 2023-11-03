@@ -1,8 +1,9 @@
 package gol
 
 import (
-	"fmt"
+	"math"
 	"strconv"
+	"sync"
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -18,19 +19,6 @@ type distributorChannels struct {
 	ioFilename chan<- string
 	ioOutput   chan<- uint8
 	ioInput    <-chan uint8
-}
-
-func findAliveCells(p Params, world [][]uint8) []util.Cell {
-	aliveCells := make([]util.Cell, p.ImageWidth*p.ImageHeight)
-	for y := 0; y < p.ImageHeight; y++ {
-		for x := 0; x < p.ImageWidth; x++ {
-			if world[x][y] == 255 {
-				newCell := util.Cell{x, y}
-				aliveCells = append(aliveCells, newCell)
-			}
-		}
-	}
-	return aliveCells
 }
 
 //Helper function to distributor to find the number of alive cells adjancent to the tile
@@ -108,16 +96,22 @@ func populateNeighboursList(inputWorld [][]uint8, prevRow, row, nextRow []uint8,
 	return neighboursList
 }
 
+func manager(imageHeight int, imageWidth int, inputWorld [][]uint8, out chan<- [][]uint8, wg *sync.WaitGroup) {
+	gameSlice := worker(imageHeight, imageWidth, inputWorld)
+	out <- gameSlice
+	defer wg.Done()
+}
+
 //Perform the game of life algorithm
-func worker(p Params, inputWorld [][]uint8) [][]uint8 {
+func worker(imageHeight int, imageWidth int, inputWorld [][]uint8) [][]uint8 {
 
 	//Create the result world
-	updatedWorld := make([][]uint8, p.ImageHeight)
+	updatedWorld := make([][]uint8, imageHeight)
 	for i := range updatedWorld {
-		updatedWorld[i] = make([]uint8, p.ImageWidth)
+		updatedWorld[i] = make([]uint8, imageWidth)
 	}
 
-	var edge int = p.ImageHeight - 1
+	var edge int = imageHeight - 1
 
 	//Go row by row
 	for i, row := range inputWorld {
@@ -162,7 +156,7 @@ func distributor(p Params, c distributorChannels) {
 	}
 
 	// contact the io
-	c.ioFilename <- (strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight))
+	c.ioFilename <- strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight)
 	c.ioCommand <- 1
 
 	for i := 0; i < p.ImageHeight; i++ {
@@ -172,14 +166,73 @@ func distributor(p Params, c distributorChannels) {
 		}
 	}
 
+	//How to change this for concurrency:
+	//Run the worker as goroutines for the number of threads
+	//Break down the board into strips whose size is defined by the number of threads
+	//Make the workers pass the finished strip of board back down a channel to remove its return value
+	//Add mutex locks for accessing the overall board
+
+	//Finds the appropriate size to be passed to each worker
+	StripSize := math.Ceil(float64(p.ImageHeight) / float64(p.Threads))
+
 	//Run the game of life algorithm for specified number of turns
 	for i := 0; i < p.Turns; i++ {
-		inputWorld = worker(p, inputWorld)
+		var newWorld [][]uint8
+		if p.Threads == 1 {
+			newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
+		} else {
+			var wg sync.WaitGroup
+			var genSlice []chan [][]uint8
+			for j := 0; j < p.Threads; j++ {
+				newSlice := make(chan [][]uint8, 2)
+				genSlice = append(genSlice, newSlice)
+			}
+			for j := 0; j < p.Threads; j++ {
+				wg.Add(1)
+				var startIndex int
+				var midIndex int
+				var endIndex int
+				var strip [][]uint8
+				if j == 0 {
+					startIndex = p.ImageHeight - 1
+					midIndex = 0
+					endIndex = (j+1)*int(StripSize) + 1
+					strip = append([][]uint8{inputWorld[startIndex]}, inputWorld[midIndex:endIndex-1]...)
+					//StripSize += 2
+				} else {
+					startIndex = j*int(StripSize) - 1
+					midIndex = j * int(StripSize)
+					if j == p.Threads-1 {
+						//fmt.Println("hi")
+						endIndex = 0
+						strip = append([][]uint8{inputWorld[startIndex]}, inputWorld[midIndex:p.ImageHeight]...)
+						StripSize = float64(p.ImageHeight - startIndex - 1)
+					} else {
+						endIndex = (j+1)*int(StripSize) + 1
+						strip = append([][]uint8{inputWorld[startIndex]}, inputWorld[midIndex:endIndex-1]...)
+					}
+				}
+				strip = append(strip, inputWorld[endIndex])
+				//fmt.Println(StripSize, strip)
+				go manager(int(StripSize)+2, p.ImageWidth, strip, genSlice[j], &wg)
+			}
+			wg.Wait()
+
+			for _, element := range genSlice {
+				var i = 0
+				for _, line := range <-element {
+					if i != 0 && i != int(StripSize+1) {
+						newWorld = append(newWorld, line)
+					}
+					i++
+				}
+			}
+		}
+		inputWorld = newWorld
 		turn++
 	}
 
 	// TODO: Execute all turns of the Game of Life.
-	fmt.Println("Finished")
 	// TODO: Report the final state using FinalTurnCompleteEvent.
 
 	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, inputWorld)}
