@@ -1,7 +1,6 @@
 package gol
 
 import (
-	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -195,8 +194,8 @@ func distributor(p Params, c distributorChannels) {
 		stripSizeList[i] = stripSize
 		sum += stripSize
 	}
-
-	fmt.Println("sum: ", sum)
+	//
+	//fmt.Println("sum: ", sum)
 
 	//We adjust the final worker's slice size to fit to the pixels
 	if sum > p.ImageHeight { //if sum is more than heigth
@@ -204,7 +203,7 @@ func distributor(p Params, c distributorChannels) {
 		stripSizeList[len(stripSizeList)-1] -= difference
 	} else if p.ImageHeight > sum { //if sum is less the same as height
 		difference := p.ImageHeight - sum
-		fmt.Println("difference: ", difference)
+		//fmt.Println("difference: ", difference)
 		stripSizeList[len(stripSizeList)-1] += difference
 	}
 
@@ -284,7 +283,7 @@ func distributor(p Params, c distributorChannels) {
 
 			waitGroup.Wait()
 			//Go through the channels and read the updated strips into the new world
-			fmt.Println(stripSizeList)
+			//fmt.Println(stripSizeList)
 			var count = 0
 			for _, element := range workerChannelList {
 				var i = 0
@@ -304,7 +303,7 @@ func distributor(p Params, c distributorChannels) {
 		turn++
 	}
 
-	fmt.Println(stripSizeList)
+	//fmt.Println(stripSizeList)
 	//We make a stripSizeArray to
 
 	// TODO: Execute all turns of the Game of Life.
