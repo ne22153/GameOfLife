@@ -58,44 +58,6 @@ func updateUpdatedWorldTile(inputWorldTile, updatedWorldTile byte, adjacentAlive
 	return updatedWorldTile
 }
 
-func populateNeighboursList(inputWorld [][]byte, prevRow, row, nextRow []byte, edgeIndex, tileIndex int) []byte {
-	neighboursList := []byte{
-		prevRow[tileIndex],
-		nextRow[tileIndex]}
-
-	//Boundary: check if the tile is to the very left of the screen, if so take left neighbours from the other side
-	if tileIndex > 0 {
-		neighboursList = append(
-			neighboursList,
-			row[(tileIndex-1)%len(inputWorld)],
-			prevRow[(tileIndex-1)%len(row)],
-			nextRow[(tileIndex-1)%len(row)])
-	} else {
-		neighboursList = append(
-			neighboursList,
-			row[edgeIndex],
-			prevRow[edgeIndex],
-			nextRow[edgeIndex])
-	}
-
-	//Boundary: check if the tile is to the very right of the screen, if so take right neighbours from the other side
-	if tileIndex < edgeIndex {
-		neighboursList = append(
-			neighboursList,
-			row[(tileIndex+1)%len(row)],
-			prevRow[(tileIndex+1)%len(row)],
-			nextRow[(tileIndex+1)%len(row)])
-	} else {
-		neighboursList = append(
-			neighboursList,
-			row[0],
-			prevRow[0],
-			nextRow[0])
-	}
-
-	return neighboursList
-}
-
 func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte, wg *sync.WaitGroup, j int) {
 	gameSlice := worker(imageHeight, imageWidth, inputWorld, j)
 	//fmt.Println(j, ": Input game: ", inputWorld, "\n Output game: ", gameSlice)
@@ -144,12 +106,6 @@ func worker(imageHeight int, imageWidth int, inputWorld [][]byte, count int) [][
 		}
 	}
 
-	//for i := 1; i < len(updatedWorld)-1; i++ {
-	//	fmt.Println(inputWorld[i], "         ", updatedWorld[i])
-	//}
-	//fmt.Println()
-	//
-	//fmt.Println("aaaa")
 	return updatedWorld
 }
 
@@ -223,6 +179,8 @@ func distributor(p Params, c distributorChannels) {
 				workerChannelList[j] = workerChannel
 			}
 
+			//We increment this variable per worker to change the height
+			//Workers are created sequentially so this variable being mutable is safe
 			currentHeight := 0
 			//We now do split the input world for each thread accordingly
 			for j := 0; j < p.Threads; j++ {
