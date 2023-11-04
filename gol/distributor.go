@@ -112,7 +112,7 @@ func worker(imageHeight int, imageWidth int, inputWorld [][]byte, count int) [][
 	for i := range updatedWorld {
 		updatedWorld[i] = make([]byte, imageWidth)
 	}
-	
+
 	//Go row by row
 	for i, row := range inputWorld {
 
@@ -122,26 +122,20 @@ func worker(imageHeight int, imageWidth int, inputWorld [][]byte, count int) [][
 		for j, tile := range row {
 
 			adjacentAliveCells := 0
-			//populate a list of neighbors of the tile
-			for k := -1; k <= 1; k++ {
-				for l := -1; l <= 1; l++ {
 
-					//Since GOL wraps around the screen we need to ensure that the indexes remain in bounds
-					//adding a +p.imagewidth/height incase i+k or j+l evaluates to -1
-					adjustedIIndex := (i + k + imageHeight) % (imageHeight)
-					adjustedJIndex := (j + l + imageWidth) % (imageWidth)
+			//We add up the values of all neighbouring cells and then divide it by LIVE to determine
+			//living neighbours count
+			adjacentAliveCells =
+				int(inputWorld[(i-1+imageHeight)%imageHeight][(j-1+imageWidth)%imageWidth]) +
+					int(inputWorld[(i-1+imageHeight)%imageHeight][(j+imageWidth)%imageWidth]) +
+					int(inputWorld[(i-1+imageHeight)%imageHeight][(j+1+imageWidth)%imageWidth]) +
+					int(inputWorld[(i+imageHeight)%imageHeight][(j-1+imageWidth)%imageWidth]) +
+					int(inputWorld[(i+imageHeight)%imageHeight][(j+1+imageWidth)%imageWidth]) +
+					int(inputWorld[(i+1+imageHeight)%imageHeight][(j-1+imageWidth)%imageWidth]) +
+					int(inputWorld[(i+1+imageHeight)%imageHeight][(j+imageWidth)%imageWidth]) +
+					int(inputWorld[(i+1+imageHeight)%imageHeight][(j+1+imageWidth)%imageWidth])
+			adjacentAliveCells = adjacentAliveCells / LIVE
 
-					if inputWorld[adjustedIIndex][adjustedJIndex] == LIVE {
-						//don't count the cell itself (offset k , l are both zero)
-						if (k == 0) && (l == 0) {
-							continue
-						} else {
-							adjacentAliveCells++
-						}
-
-					}
-				}
-			}
 			var placeHolder = updateUpdatedWorldTile(tile, updatedWorld[i][j], adjacentAliveCells)
 			updatedWorld[i][j] = placeHolder
 			//if placeHolder == LIVE {
