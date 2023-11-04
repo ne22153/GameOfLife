@@ -112,29 +112,34 @@ func worker(imageHeight int, imageWidth int, inputWorld [][]byte, count int) [][
 	for i := range updatedWorld {
 		updatedWorld[i] = make([]byte, imageWidth)
 	}
-
-	var edge int = imageHeight - 1
-
+	
 	//Go row by row
 	for i, row := range inputWorld {
 
 		//We find the rows above and below the current row the tile is at
-		var prevRow []byte = inputWorld[((i + len(updatedWorld) - 1) % len(updatedWorld))]
-		var nextRow []byte = inputWorld[((i + len(updatedWorld) + 1) % len(updatedWorld))]
 
 		//Go through the elements in each row
 		for j, tile := range row {
 
+			adjacentAliveCells := 0
 			//populate a list of neighbors of the tile
-			var neighboursList []byte = populateNeighboursList(inputWorld, prevRow, row, nextRow, edge, j)
+			for k := -1; k <= 1; k++ {
+				for l := -1; l <= 1; l++ {
 
-			//fmt.Println("number of neighbours", len(neighboursList)) //must always be 8
+					//Since GOL wraps around the screen we need to ensure that the indexes remain in bounds
+					//adding a +p.imagewidth/height incase i+k or j+l evaluates to -1
+					adjustedIIndex := (i + k + imageHeight) % (imageHeight)
+					adjustedJIndex := (j + l + imageWidth) % (imageWidth)
 
-			//Find number of adjacent tiles that are alive
-			var adjacentAliveCells int = 0
-			for _, value := range neighboursList {
-				if value > 0 {
-					adjacentAliveCells++
+					if inputWorld[adjustedIIndex][adjustedJIndex] == LIVE {
+						//don't count the cell itself (offset k , l are both zero)
+						if (k == 0) && (l == 0) {
+							continue
+						} else {
+							adjacentAliveCells++
+						}
+
+					}
 				}
 			}
 			var placeHolder = updateUpdatedWorldTile(tile, updatedWorld[i][j], adjacentAliveCells)
