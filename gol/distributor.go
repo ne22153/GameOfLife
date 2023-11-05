@@ -226,14 +226,6 @@ func distributor(p Params, c distributorChannels) {
 					strip = append(strip, inputWorld[endBuffer])
 				}
 
-				//fmt.Println("current height after: ", currentHeight)
-				//fmt.Println("strip size:", stripSizeList[j])
-				//fmt.Println("worker: ", j)
-				//for _, entry := range strip {
-				//	fmt.Println(entry, "oof")
-				//}
-				//fmt.Println("bruh")
-
 				go manager((stripSizeList[j])+2, p.ImageWidth, strip, workerChannelList[j],
 					&waitGroup, j)
 
@@ -242,19 +234,13 @@ func distributor(p Params, c distributorChannels) {
 			waitGroup.Wait()
 			//Go through the channels and read the updated strips into the new world
 			//fmt.Println(stripSizeList)
-			var count = 0
-			for _, element := range workerChannelList {
-				var i = 0
-				for _, line := range <-element {
-					if i != 0 && i != int(stripSizeList[count]+1) {
-						//fmt.Println(count, line)
-						newWorld = append(newWorld, line)
-					} else {
-						//fmt.Println("Skipped")
-					}
-					i++
-				}
-				count++
+			for i := 0; i < len(workerChannelList); i++ {
+				//worldSection is just a gameslice from a specific worker
+				worldSection := <-(workerChannelList[i])
+				endBufferIndex := stripSizeList[i] + 1
+
+				//We don't add the top and end buffers (that's what the inner loop's doing)
+				newWorld = append(newWorld, worldSection[1:endBufferIndex]...)
 			}
 		}
 		inputWorld = newWorld
