@@ -38,7 +38,6 @@ func updateUpdatedWorldTile(inputWorldTile, updatedWorldTile byte, adjacentAlive
 	// if the element is dead, then run through those checks
 	if inputWorldTile == DEAD {
 		if adjacentAliveCells > 0 {
-			//fmt.Println(num, ", world", index2, index)
 		}
 		if adjacentAliveCells == 3 {
 			updatedWorldTile = LIVE
@@ -60,7 +59,6 @@ func updateUpdatedWorldTile(inputWorldTile, updatedWorldTile byte, adjacentAlive
 
 func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte, wg *sync.WaitGroup, j int) {
 	gameSlice := worker(imageHeight, imageWidth, inputWorld, j)
-	//fmt.Println(j, ": Input game: ", inputWorld, "\n Output game: ", gameSlice)
 	out <- gameSlice
 	defer wg.Done()
 }
@@ -99,10 +97,6 @@ func worker(imageHeight int, imageWidth int, inputWorld [][]byte, count int) [][
 
 			var placeHolder = updateUpdatedWorldTile(tile, updatedWorld[i][j], adjacentAliveCells)
 			updatedWorld[i][j] = placeHolder
-			//if placeHolder == LIVE {
-			//	fmt.Println(count, ":", j, i)
-			//}
-
 		}
 	}
 
@@ -150,8 +144,6 @@ func distributor(p Params, c distributorChannels) {
 		stripSizeList[i] = stripSize
 		sum += stripSize
 	}
-	//
-	//fmt.Println("sum: ", sum)
 
 	//We adjust the final worker's slice size to fit to the pixels
 	if sum > p.ImageHeight { //if sum is more than heigth
@@ -203,17 +195,15 @@ func distributor(p Params, c distributorChannels) {
 
 					currentHeight += stripSizeList[j]
 					strip = append(strip, inputWorld[topBuffer])
-					strip = append(strip, inputWorld[startIndex:endBuffer]...)
-					strip = append(strip, inputWorld[endBuffer])
+					strip = append(strip, inputWorld[startIndex:endBuffer+1]...)
 				} else if j == p.Threads-1 { //final worker
 
 					//fmt.Println("Entering final worker")
 					topBuffer = currentHeight - 1
 					startIndex = currentHeight
 					endBuffer = 0
-
-					strip = append(strip, inputWorld[topBuffer])
-					strip = append(strip, inputWorld[startIndex:p.ImageHeight]...)
+					
+					strip = append(strip, inputWorld[topBuffer:p.ImageHeight]...)
 					strip = append(strip, inputWorld[0])
 				} else { //middle workers
 					topBuffer = currentHeight - 1
@@ -221,9 +211,7 @@ func distributor(p Params, c distributorChannels) {
 					endBuffer = currentHeight + stripSizeList[j]
 
 					currentHeight += stripSizeList[j]
-					strip = append(strip, inputWorld[topBuffer])
-					strip = append(strip, inputWorld[startIndex:endBuffer]...)
-					strip = append(strip, inputWorld[endBuffer])
+					strip = append(strip, inputWorld[topBuffer:endBuffer+1]...)
 				}
 
 				go manager((stripSizeList[j])+2, p.ImageWidth, strip, workerChannelList[j],
@@ -233,7 +221,6 @@ func distributor(p Params, c distributorChannels) {
 
 			waitGroup.Wait()
 			//Go through the channels and read the updated strips into the new world
-			//fmt.Println(stripSizeList)
 			for i := 0; i < len(workerChannelList); i++ {
 				//worldSection is just a gameslice from a specific worker
 				worldSection := <-(workerChannelList[i])
