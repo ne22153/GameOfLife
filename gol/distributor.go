@@ -286,6 +286,18 @@ func distributor(p Params, c distributorChannels) {
 	// TODO: Report the final state using FinalTurnCompleteEvent.
 
 	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, inputWorld)}
+	aliveCellsTicker.Stop() //We need to stop the ticker
+
+	c.ioCommand <- ioOutput
+	var filename string = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(p.Turns)
+	c.ioFilename <- filename
+	for i := 0; i < p.ImageHeight; i++ {
+		for j := 0; j < p.ImageWidth; j++ {
+			//WE populate the slice one input at a time.
+			c.ioOutput <- inputWorld[i][j]
+		}
+
+	}
 
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
