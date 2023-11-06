@@ -148,6 +148,7 @@ func startIo(p Params, c ioChannels) {
 			case ioCheckIdle:
 				io.channels.idle <- true
 			}
+
 		}
 	}
 }

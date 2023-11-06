@@ -4,6 +4,7 @@ import (
 	"math"
 	"strconv"
 	"sync"
+	"time"
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -170,10 +171,25 @@ func createStrip(world [][]byte, stripSizeList []int, workerNumber, imageHeight,
 	return strip
 }
 
+func getAliveCellsCount(inputWorld [][]byte) int {
+	aliveCells := 0
+
+	for _, row := range inputWorld {
+		for _, tile := range row {
+			if tile == LIVE {
+				aliveCells++
+			}
+		}
+	}
+
+	return aliveCells
+}
+
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
 
 	var turn int = 0
+	var aliveCells int = 0
 
 	//We create the worlds
 	inputWorld := make([][]byte, p.ImageHeight)
@@ -204,6 +220,21 @@ func distributor(p Params, c distributorChannels) {
 	//Check: if product of stripSize and threads is one more strip than needed
 
 	//We increment this across workers
+
+	aliveCells = getAliveCellsCount(inputWorld)
+	//We create a ticker
+	aliveCellsTicker := time.NewTicker(2 * time.Second)
+
+	//We make an anonymous goroutine for the ticker
+	go func() {
+		for {
+			select {
+			case <-aliveCellsTicker.C:
+				c.events <- AliveCellsCount{turn, aliveCells}
+			}
+		}
+
+	}()
 
 	//Run the GoL algorithm for specificed number of turns
 	for i := 0; i < p.Turns; i++ {
@@ -245,7 +276,9 @@ func distributor(p Params, c distributorChannels) {
 			}
 		}
 		inputWorld = newWorld
+		aliveCells = getAliveCellsCount(inputWorld)
 		turn++
+
 	}
 	//We make a stripSizeArray to
 
