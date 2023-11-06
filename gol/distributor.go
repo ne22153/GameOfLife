@@ -36,10 +36,9 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	return coordinates
 }
 
-func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte, wg *sync.WaitGroup, j int) {
+func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte) {
 	gameSlice := worker(imageHeight, imageWidth, inputWorld)
 	out <- gameSlice
-	defer wg.Done()
 }
 
 //Determine how big the slice of the GoL board that the worker will work on.
@@ -123,7 +122,6 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 	}
 
 	return aliveCells
-	//dummy comment
 }
 
 //Manages the key press interrupts
@@ -135,14 +133,10 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 		case key := <-keyPresses:
 			if key == 's' {
 				//When s is pressed, we need to generate a PGM file with the current state of the board
-				c.ioCommand <- ioOutput
-				var filename string = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(p.Turns)
-				c.ioFilename <- filename
-				for i := 0; i < p.ImageHeight; i++ {
-					for j := 0; j < p.ImageWidth; j++ {
-						c.ioOutput <- inputWorld[i][j]
-					}
-				}
+
+				var filename string = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.
+					Itoa(turns)
+				writeToFileIO(inputWorld, p.ImageHeight, p.ImageWidth, turns, filename, c)
 			} else if key == 'p' {
 				//When p is pressed, pause the processing and print the current turn that is being processed
 				//If p is pressed again resume the processing
@@ -157,21 +151,8 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 
 			} else if key == 'q' {
 				//When q is pressed, generate a PGM file with the current state of the board then terminate
-				c.ioCommand <- ioOutput
-				var filename string = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(p.Turns)
-				c.ioFilename <- filename
-				for i := 0; i < p.ImageHeight; i++ {
-					for j := 0; j < p.ImageWidth; j++ {
-						c.ioOutput <- inputWorld[i][j]
-					}
-				}
-
-				c.ioCommand <- ioCheckIdle
-				<-c.ioIdle
-
-				c.events <- StateChange{turns, Quitting}
-				aliveCellsTicker.Stop()
-				close(c.events)
+				handleGameShutDown(inputWorld, p.ImageHeight, p.ImageWidth, turns, c, aliveCellsTicker)
+				//Exit the program
 				os.Exit(0)
 			}
 		//When turn is incremented, we're informed of the change
@@ -184,63 +165,132 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 	}
 }
 
+//Helper function of distributor. We use this to create an initial world map from a file name
+func writeFromFileIO(imageHeight, imageWidth int, c distributorChannels) [][]byte {
+
+	//We create the worlds
+	var world [][]byte = make([][]byte, imageHeight)
+	for i := 0; i < imageHeight; i++ {
+		world[i] = make([]byte, imageWidth)
+	}
+
+	//We set the command to input to be able to read from the file
+	c.ioFilename <- strconv.Itoa(imageWidth) + "x" + strconv.Itoa(imageHeight)
+	c.ioCommand <- ioInput
+
+	for i := 0; i < imageHeight; i++ {
+		for j := 0; j < imageWidth; j++ {
+			//We populate the slice one input at a time.
+			world[i][j] = <-(c.ioInput)
+		}
+	}
+
+	return world
+}
+func writeToFileIO(world [][]byte, imageHeight, imageWidth, turns int, filename string,
+	c distributorChannels) {
+	c.ioCommand <- ioOutput
+	c.ioFilename <- filename
+	for i := 0; i < imageHeight; i++ {
+		for j := 0; j < imageWidth; j++ {
+			c.ioOutput <- world[i][j]
+		}
+	}
+}
+func aliveCellsReporter(turn, aliveCells *int, ticker *time.Ticker, c distributorChannels) {
+	for {
+		select {
+		case <-ticker.C:
+			c.events <- AliveCellsCount{(*turn), (*aliveCells)}
+		}
+	}
+
+}
+
+//Helper function of distributor
+//We use this to change color of the cells in SDL GUI (this flip intializes drawing)
+func flipWorldCellsInitial(world [][]byte, imageHeight, imageWidth, turn int, c distributorChannels) {
+	for i := 0; i < imageHeight; i++ {
+		for j := 0; j < imageWidth; j++ {
+			if world[i][j] == LIVE {
+				c.events <- CellFlipped{turn, util.Cell{j, i}}
+			}
+		}
+	}
+}
+
+//Helper function of distributor
+//We use this to change color of the cells in SDL GUI (update renderer after an iteration has been computed)
+func flipWorldCellsIteration(oldWorld, newWorld [][]byte, turn, imageHeight, imageWidth int, c distributorChannels) {
+	for i := 0; i < imageHeight; i++ {
+		for j := 0; j < imageWidth; j++ {
+			//If the cell has changed since the last iteration, we need to send an event to say so
+			if oldWorld[i][j] != newWorld[i][j] {
+				c.events <- CellFlipped{turn, util.Cell{j, i}}
+			}
+		}
+	}
+	c.events <- TurnComplete{turn}
+}
+
+//Helper function of distributor
+//We merge worker strips into one world [][]byte (we also remove buffers from each worker as well)
+func mergeWorkerStrips(newWorld [][]byte, workerChannelList []chan [][]byte, stripSizeList []int) [][]byte {
+	for i := 0; i < len(workerChannelList); i++ {
+		//worldSection is just a gameslice from a specific worker
+		worldSection := <-(workerChannelList[i])
+		endBufferIndex := stripSizeList[i] + 1
+
+		//We don't add the top and end buffers (that's what the inner loop's doing)
+		newWorld = append(newWorld, worldSection[1:endBufferIndex]...)
+	}
+
+	return newWorld
+}
+
+//Helper function of distributor
+//Performs necessary logic to end the game neatly
+func handleGameShutDown(world [][]byte, imageHeight, imageWidth, turns int, c distributorChannels,
+	ticker *time.Ticker) {
+	var filename string = strconv.Itoa(imageWidth) + "x" + strconv.Itoa(imageHeight) + "x" + strconv.Itoa(turns)
+
+	writeToFileIO(world, imageHeight, imageWidth, turns, filename, c)
+
+	//Make sure that the Io has finished any output before exiting.
+	c.ioCommand <- ioCheckIdle
+	<-c.ioIdle
+
+	c.events <- StateChange{turns, Quitting}
+	ticker.Stop()
+	//Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
+	close(c.events)
+}
+
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	var turn int = 0
 	var aliveCells int = 0
-
-	//We create the worlds
-	inputWorld := make([][]byte, p.ImageHeight)
-	for i := 0; i < p.ImageHeight; i++ {
-		inputWorld[i] = make([]byte, p.ImageWidth)
-	}
-
-	// contact the io
-	c.ioFilename <- strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight)
-	c.ioCommand <- 1
-
-	for i := 0; i < p.ImageHeight; i++ {
-		for j := 0; j < p.ImageWidth; j++ {
-			//WE populate the slice one input at a time.
-			inputWorld[i][j] = <-(c.ioInput)
-		}
-	}
+	var inputWorld [][]byte = writeFromFileIO(p.ImageHeight, p.ImageWidth, c)
 
 	//We need to find the strip sized passed to each worker
-	stripSize := int(math.Ceil(float64(p.ImageHeight / p.Threads)))
-	stripSizeList := distributeSliceSizes(stripSize, p.Threads, p.ImageHeight)
-	//Check: if product of stripSize and threads is one more strip than needed
-
-	//We increment this across workers
+	var stripSize int = int(math.Ceil(float64(p.ImageHeight / p.Threads)))
+	var stripSizeList []int = distributeSliceSizes(stripSize, p.Threads, p.ImageHeight)
 
 	aliveCells = getAliveCellsCount(inputWorld)
 	//We create a ticker
 	aliveCellsTicker := time.NewTicker(2 * time.Second)
 
-	//We make an anonymous goroutine for the ticker
-	go func() {
-		for {
-			select {
-			case <-aliveCellsTicker.C:
-				c.events <- AliveCellsCount{turn, aliveCells}
-			}
-		}
+	//We report the alive cells every two secs
+	go aliveCellsReporter(&turn, &aliveCells, aliveCellsTicker, c)
 
-	}()
-
-	turnChannel := make(chan int)
-	pauseChannel := make(chan bool)
+	var turnChannel chan int = make(chan int)
+	var pauseChannel chan bool = make(chan bool)
+	//Keep track of any keypresses by the user
 	go goPressTrack(inputWorld, keyPresses, c, p, turnChannel, aliveCellsTicker, pauseChannel)
 
 	//We flip the cells
-	for i := 0; i < p.ImageHeight; i++ {
-		for j := 0; j < p.ImageWidth; j++ {
-			if inputWorld[i][j] == LIVE {
-				c.events <- CellFlipped{turn, util.Cell{j, i}}
-			}
-		}
-	}
+	flipWorldCellsInitial(inputWorld, p.ImageHeight, p.ImageWidth, turn, c)
 
 	//Run the GoL algorithm for specificed number of turns
 	for i := 0; i < p.Turns; i++ {
@@ -260,65 +310,34 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			for j := 0; j < p.Threads; j++ {
 				waitGroup.Add(1)
 
-				var strip [][]byte = createStrip(inputWorld, stripSizeList,
-					j, p.ImageHeight, p.Threads)
-				go manager((stripSizeList[j])+2, p.ImageWidth, strip, workerChannelList[j],
-					&waitGroup, j)
-
+				go func(workerNumber int) {
+					//fmt.Println("Processed worker: ", workerNumber)
+					var strip [][]byte = createStrip(inputWorld, stripSizeList,
+						workerNumber, p.ImageHeight, p.Threads)
+					//Add +2 to account for top and bottom buffer
+					var workerStripSize int = (stripSizeList[workerNumber]) + 2
+					manager(workerStripSize, p.ImageWidth, strip,
+						workerChannelList[workerNumber])
+					defer waitGroup.Done()
+				}(j)
 			}
-
 			waitGroup.Wait()
-			//Go through the channels and read the updated strips into the new world
-			for i := 0; i < len(workerChannelList); i++ {
-				//worldSection is just a gameslice from a specific worker
-				worldSection := <-(workerChannelList[i])
-				endBufferIndex := stripSizeList[i] + 1
 
-				//We don't add the top and end buffers (that's what the inner loop's doing)
-				newWorld = append(newWorld, worldSection[1:endBufferIndex]...)
-			}
+			newWorld = mergeWorkerStrips(newWorld, workerChannelList, stripSizeList)
 		}
 		turn++
 		turnChannel <- turn
 
-		//fmt.Println(turn)
+		//Update alive cells
 		aliveCells = getAliveCellsCount(newWorld)
-		//fmt.Println(aliveCells)
 		<-pauseChannel
-		for i := 0; i < p.ImageHeight; i++ {
-			for j := 0; j < p.ImageWidth; j++ {
-				//If the cell has changed since the last iteration, we need to send an event to say so
-				if inputWorld[i][j] != newWorld[i][j] {
-					c.events <- CellFlipped{turn, util.Cell{j, i}}
-				}
-			}
-		}
-		c.events <- TurnComplete{turn}
+
+		flipWorldCellsIteration(inputWorld, newWorld, turn, p.ImageHeight, p.ImageHeight, c)
 
 		inputWorld = newWorld
-
 	}
 
 	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, inputWorld)}
-	aliveCellsTicker.Stop() //We need to stop the ticker
 
-	c.ioCommand <- ioOutput
-	var filename string = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(p.Turns)
-	c.ioFilename <- filename
-	for i := 0; i < p.ImageHeight; i++ {
-		for j := 0; j < p.ImageWidth; j++ {
-			//We populate the slice one input at a time.
-			c.ioOutput <- inputWorld[i][j]
-		}
-
-	}
-
-	//Make sure that the Io has finished any output before exiting.
-	c.ioCommand <- ioCheckIdle
-	<-c.ioIdle
-
-	c.events <- StateChange{turn, Quitting}
-	aliveCellsTicker.Stop()
-	//Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
-	close(c.events)
+	handleGameShutDown(inputWorld, p.ImageHeight, p.ImageWidth, p.Turns, c, aliveCellsTicker)
 }
