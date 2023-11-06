@@ -96,8 +96,7 @@ func worker(imageHeight int, imageWidth int, inputWorld [][]byte, count int) [][
 					int(inputWorld[(i+1+imageHeight)%imageHeight][(j+1+imageWidth)%imageWidth])
 			adjacentAliveCells = adjacentAliveCells / LIVE
 
-			var placeHolder = updateUpdatedWorldTile(tile, updatedWorld[i][j], adjacentAliveCells)
-			updatedWorld[i][j] = placeHolder
+			updatedWorld[i][j] = updateUpdatedWorldTile(tile, updatedWorld[i][j], adjacentAliveCells)
 		}
 	}
 
@@ -185,8 +184,46 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 	return aliveCells
 }
 
+//Manages the key press interrupts
+func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChannels, p Params, kill chan bool) {
+	for {
+		select {
+		case key := <-keyPresses:
+			if key == 's' {
+				//When s is pressed, we need to generate a PGM file with the current state of the board
+				c.ioCommand <- ioOutput
+				var filename string = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(p.Turns)
+				c.ioFilename <- filename
+				for i := 0; i < p.ImageHeight; i++ {
+					for j := 0; j < p.ImageWidth; j++ {
+						c.ioOutput <- inputWorld[i][j]
+					}
+				}
+			} else if key == 'p' {
+				//When p is pressed, pause the processing and print the current turn that is being processed
+				//If p is pressed again resume the processing
+
+			} else if key == 'q' {
+				//When q is pressed, generate a PGM file with the current state of the board then terminate
+				c.ioCommand <- ioOutput
+				var filename string = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(p.Turns)
+				c.ioFilename <- filename
+				for i := 0; i < p.ImageHeight; i++ {
+					for j := 0; j < p.ImageWidth; j++ {
+						c.ioOutput <- inputWorld[i][j]
+					}
+				}
+
+				//To close all the available channels, stopping the goroutines
+				kill <- false
+
+			}
+		}
+	}
+}
+
 // distributor divides the work between workers and interacts with other goroutines.
-func distributor(p Params, c distributorChannels) {
+func distributor(p Params, c distributorChannels, keyPresses <-chan rune, kill chan bool) {
 
 	var turn int = 0
 	var aliveCells int = 0
@@ -235,6 +272,8 @@ func distributor(p Params, c distributorChannels) {
 		}
 
 	}()
+
+	go goPressTrack(inputWorld, keyPresses, c, p, kill)
 
 	//We flip the cells
 	for i := 0; i < p.ImageHeight; i++ {
@@ -285,10 +324,12 @@ func distributor(p Params, c distributorChannels) {
 				newWorld = append(newWorld, worldSection[1:endBufferIndex]...)
 			}
 		}
+		aliveCells = getAliveCellsCount(newWorld)
 		turn++
 
 		for i := 0; i < p.ImageHeight; i++ {
 			for j := 0; j < p.ImageWidth; j++ {
+				//If the cell has changed since the last iteration, we need to send an event to say so
 				if inputWorld[i][j] != newWorld[i][j] {
 					c.events <- CellFlipped{turn, util.Cell{i, j}}
 				}
@@ -297,13 +338,8 @@ func distributor(p Params, c distributorChannels) {
 		c.events <- TurnComplete{turn}
 
 		inputWorld = newWorld
-		aliveCells = getAliveCellsCount(inputWorld)
 
 	}
-	//We make a stripSizeArray to
-
-	// TODO: Execute all turns of the Game of Life.
-	// TODO: Report the final state using FinalTurnCompleteEvent.
 
 	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, inputWorld)}
 	aliveCellsTicker.Stop() //We need to stop the ticker
@@ -313,18 +349,18 @@ func distributor(p Params, c distributorChannels) {
 	c.ioFilename <- filename
 	for i := 0; i < p.ImageHeight; i++ {
 		for j := 0; j < p.ImageWidth; j++ {
-			//WE populate the slice one input at a time.
+			//We populate the slice one input at a time.
 			c.ioOutput <- inputWorld[i][j]
 		}
 
 	}
 
-	// Make sure that the Io has finished any output before exiting.
+	//Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
 
 	c.events <- StateChange{turn, Quitting}
 
-	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
+	//Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
 }

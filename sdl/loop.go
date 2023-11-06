@@ -17,10 +17,15 @@ sdlLoop:
 			case *sdl.KeyboardEvent:
 				switch e.Keysym.Sym {
 				case sdl.K_p:
+					//When p is pressed, pause the processing and print the current turn that is being processed
+					//If p is pressed again resume the processing
 					keyPresses <- 'p'
+					fmt.Println("P pressed")
 				case sdl.K_s:
+					//When s is pressed, we need to generate a PGM file with the current state of the board
 					keyPresses <- 's'
 				case sdl.K_q:
+					//When q is pressed, generate a PGM file with the current state of the board then terminate
 					keyPresses <- 'q'
 				case sdl.K_k:
 					keyPresses <- 'k'
