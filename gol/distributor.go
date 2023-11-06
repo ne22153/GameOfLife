@@ -185,6 +185,7 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 	}
 
 	return aliveCells
+	//dummy comment
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
