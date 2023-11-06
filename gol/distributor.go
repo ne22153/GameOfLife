@@ -1,7 +1,6 @@
 package gol
 
 import (
-	"fmt"
 	"math"
 	"os"
 	"strconv"
@@ -61,13 +60,13 @@ func updateUpdatedWorldTile(inputWorldTile, updatedWorldTile byte, adjacentAlive
 }
 
 func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte, wg *sync.WaitGroup, j int) {
-	gameSlice := worker(imageHeight, imageWidth, inputWorld, j)
+	gameSlice := worker(imageHeight, imageWidth, inputWorld)
 	out <- gameSlice
 	defer wg.Done()
 }
 
 //Perform the game of life algorithm
-func worker(imageHeight int, imageWidth int, inputWorld [][]byte, count int) [][]byte {
+func worker(imageHeight int, imageWidth int, inputWorld [][]byte) [][]byte {
 
 	//Create the result world
 	updatedWorld := make([][]byte, imageHeight)
@@ -270,12 +269,6 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		}
 	}
 
-	//How to change this for concurrency:
-	//Run the worker as goroutines for the number of threads
-	//Break down the board into strips whose size is defined by the number of threads
-	//Make the workers pass the finished strip of board back down a channel to remove its return value
-	//Add mutex locks for accessing the overall board
-
 	//We need to find the strip sized passed to each worker
 	stripSize := int(math.Ceil(float64(p.ImageHeight / p.Threads)))
 	stripSizeList := distributeSliceSizes(stripSize, p.Threads, p.ImageHeight)
@@ -311,13 +304,11 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		}
 	}
 
-	fmt.Println(aliveCells)
-
 	//Run the GoL algorithm for specificed number of turns
 	for i := 0; i < p.Turns; i++ {
 		var newWorld [][]byte
 		if p.Threads == 1 {
-			newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld, 1)
+			newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
 		} else {
 			//	We need to make a wait group and communication channels for each strip
 			var waitGroup sync.WaitGroup
