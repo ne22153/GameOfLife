@@ -3,6 +3,7 @@ package gol
 import (
 	"fmt"
 	"math"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -189,7 +190,9 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 }
 
 //Manages the key press interrupts
-func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChannels, p Params, turn int, aliveCellsTicker *time.Ticker) {
+func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChannels, p Params, turn chan int, aliveCellsTicker *time.Ticker, pauseChannel chan bool) {
+	var turns = 0
+	var paused = false
 	for {
 		select {
 		case key := <-keyPresses:
@@ -206,6 +209,14 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 			} else if key == 'p' {
 				//When p is pressed, pause the processing and print the current turn that is being processed
 				//If p is pressed again resume the processing
+				if paused {
+					c.events <- StateChange{turns, Executing}
+					paused = !paused
+					pauseChannel <- true
+				} else {
+					c.events <- StateChange{turns, Paused}
+					paused = !paused
+				}
 
 			} else if key == 'q' {
 				//When q is pressed, generate a PGM file with the current state of the board then terminate
@@ -221,9 +232,16 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 				c.ioCommand <- ioCheckIdle
 				<-c.ioIdle
 
-				c.events <- StateChange{turn, Quitting}
+				c.events <- StateChange{turns, Quitting}
 				aliveCellsTicker.Stop()
 				close(c.events)
+				os.Exit(0)
+			}
+		//When turn is incremented, we're informed of the change
+		case t := <-turn:
+			turns = t
+			if !paused {
+				pauseChannel <- true
 			}
 		}
 	}
@@ -280,7 +298,9 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	}()
 
-	go goPressTrack(inputWorld, keyPresses, c, p, turn, aliveCellsTicker)
+	turnChannel := make(chan int)
+	pauseChannel := make(chan bool)
+	go goPressTrack(inputWorld, keyPresses, c, p, turnChannel, aliveCellsTicker, pauseChannel)
 
 	//We flip the cells
 	for i := 0; i < p.ImageHeight; i++ {
@@ -330,11 +350,12 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			}
 		}
 		turn++
+		turnChannel <- turn
 
 		//fmt.Println(turn)
 		aliveCells = getAliveCellsCount(newWorld)
 		//fmt.Println(aliveCells)
-
+		<-pauseChannel
 		for i := 0; i < p.ImageHeight; i++ {
 			for j := 0; j < p.ImageWidth; j++ {
 				//If the cell has changed since the last iteration, we need to send an event to say so
