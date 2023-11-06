@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"runtime"
 
 	"uk.ac.bris.cs/gameoflife/gol"
@@ -52,9 +51,8 @@ func main() {
 
 	keyPresses := make(chan rune, 10)
 	events := make(chan gol.Event, 1000)
-	kill := make(chan bool)
 
-	go gol.Run(params, events, keyPresses, kill)
+	go gol.Run(params, events, keyPresses)
 	if !(*noVis) {
 		sdl.Run(params, events, keyPresses)
 	} else {
@@ -64,11 +62,6 @@ func main() {
 			switch event.(type) {
 			case gol.FinalTurnComplete:
 				complete = true
-			default:
-				switch {
-				case <-kill:
-					os.Exit(0)
-				}
 			}
 		}
 	}

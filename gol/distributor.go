@@ -1,6 +1,7 @@
 package gol
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -133,8 +134,7 @@ func distributeSliceSizes(stripSize, threads, imageHeight int) []int {
 
 // creates the strip that the worker will operate on
 // currentHeight is pass by reference so that it will update for the next worker
-func createStrip(world [][]byte, stripSizeList []int, workerNumber, imageHeight, threads int,
-	currentHeight *int) [][]byte {
+func createStrip(world [][]byte, stripSizeList []int, workerNumber, imageHeight, threads int) [][]byte {
 	var topBuffer int
 	var endBuffer int
 	var startIndex int
@@ -142,28 +142,31 @@ func createStrip(world [][]byte, stripSizeList []int, workerNumber, imageHeight,
 	//We initialize the strip
 	var strip [][]byte
 
+	//We exploit the fact that every strip size but the last one is the same so we can just precalcualte the currentY
+	//cordinate locally
+	var normalStripSize int = stripSizeList[0]
+	currentY := (normalStripSize) * workerNumber
+
 	if workerNumber == 0 { //starting worker
 		topBuffer = imageHeight - 1
 		startIndex = 0
-		endBuffer = (*currentHeight) + stripSizeList[workerNumber]
+		endBuffer = stripSizeList[0] //first worker
 
-		(*currentHeight) += stripSizeList[workerNumber]
 		strip = append(strip, world[topBuffer])
 		strip = append(strip, world[startIndex:endBuffer+1]...)
 	} else if workerNumber == threads-1 { //final worker
 
-		topBuffer = (*currentHeight) - 1
-		startIndex = (*currentHeight)
+		topBuffer = currentY - 1
+		startIndex = currentY
 		endBuffer = 0
 
 		strip = append(strip, world[topBuffer:imageHeight]...)
 		strip = append(strip, world[0])
 	} else { //middle workers
-		topBuffer = (*currentHeight) - 1
-		startIndex = (*currentHeight)
-		endBuffer = (*currentHeight) + stripSizeList[workerNumber]
+		topBuffer = currentY - 1
+		startIndex = currentY
+		endBuffer = currentY + normalStripSize
 
-		(*currentHeight) += stripSizeList[workerNumber]
 		strip = append(strip, world[topBuffer:endBuffer+1]...)
 	}
 
@@ -182,10 +185,11 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 	}
 
 	return aliveCells
+	//dummy comment
 }
 
 //Manages the key press interrupts
-func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChannels, p Params, kill chan bool) {
+func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChannels, p Params, turn int, aliveCellsTicker *time.Ticker) {
 	for {
 		select {
 		case key := <-keyPresses:
@@ -214,16 +218,19 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 					}
 				}
 
-				//To close all the available channels, stopping the goroutines
-				kill <- false
+				c.ioCommand <- ioCheckIdle
+				<-c.ioIdle
 
+				c.events <- StateChange{turn, Quitting}
+				aliveCellsTicker.Stop()
+				close(c.events)
 			}
 		}
 	}
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
-func distributor(p Params, c distributorChannels, keyPresses <-chan rune, kill chan bool) {
+func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	var turn int = 0
 	var aliveCells int = 0
@@ -273,17 +280,18 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune, kill c
 
 	}()
 
-	go goPressTrack(inputWorld, keyPresses, c, p, kill)
+	go goPressTrack(inputWorld, keyPresses, c, p, turn, aliveCellsTicker)
 
 	//We flip the cells
 	for i := 0; i < p.ImageHeight; i++ {
 		for j := 0; j < p.ImageWidth; j++ {
 			if inputWorld[i][j] == LIVE {
-				c.events <- CellFlipped{turn, util.Cell{i, j}}
+				c.events <- CellFlipped{turn, util.Cell{j, i}}
 			}
 		}
 	}
-	c.events <- TurnComplete{turn}
+
+	fmt.Println(aliveCells)
 
 	//Run the GoL algorithm for specificed number of turns
 	for i := 0; i < p.Turns; i++ {
@@ -299,15 +307,12 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune, kill c
 				workerChannelList[j] = workerChannel
 			}
 
-			//We increment this variable per worker to change the height
-			//Workers are created sequentially so this variable being mutable is safe
-			currentHeight := 0
 			//We now do split the input world for each thread accordingly
 			for j := 0; j < p.Threads; j++ {
 				waitGroup.Add(1)
 
 				var strip [][]byte = createStrip(inputWorld, stripSizeList,
-					j, p.ImageHeight, p.Threads, &currentHeight)
+					j, p.ImageHeight, p.Threads)
 				go manager((stripSizeList[j])+2, p.ImageWidth, strip, workerChannelList[j],
 					&waitGroup, j)
 
@@ -324,14 +329,17 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune, kill c
 				newWorld = append(newWorld, worldSection[1:endBufferIndex]...)
 			}
 		}
-		aliveCells = getAliveCellsCount(newWorld)
 		turn++
+
+		//fmt.Println(turn)
+		aliveCells = getAliveCellsCount(newWorld)
+		//fmt.Println(aliveCells)
 
 		for i := 0; i < p.ImageHeight; i++ {
 			for j := 0; j < p.ImageWidth; j++ {
 				//If the cell has changed since the last iteration, we need to send an event to say so
 				if inputWorld[i][j] != newWorld[i][j] {
-					c.events <- CellFlipped{turn, util.Cell{i, j}}
+					c.events <- CellFlipped{turn, util.Cell{j, i}}
 				}
 			}
 		}
@@ -360,7 +368,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune, kill c
 	<-c.ioIdle
 
 	c.events <- StateChange{turn, Quitting}
-
+	aliveCellsTicker.Stop()
 	//Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
 }
