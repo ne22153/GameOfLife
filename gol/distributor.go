@@ -1,6 +1,7 @@
 package gol
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -243,11 +244,12 @@ func distributor(p Params, c distributorChannels) {
 	for i := 0; i < p.ImageHeight; i++ {
 		for j := 0; j < p.ImageWidth; j++ {
 			if inputWorld[i][j] == LIVE {
-				c.events <- CellFlipped{turn, util.Cell{i, j}}
+				c.events <- CellFlipped{turn, util.Cell{j, i}}
 			}
 		}
 	}
-	c.events <- TurnComplete{turn}
+
+	fmt.Println(aliveCells)
 
 	//Run the GoL algorithm for specificed number of turns
 	for i := 0; i < p.Turns; i++ {
@@ -285,19 +287,23 @@ func distributor(p Params, c distributorChannels) {
 				newWorld = append(newWorld, worldSection[1:endBufferIndex]...)
 			}
 		}
+
 		turn++
+
+		//fmt.Println(turn)
+		aliveCells = getAliveCellsCount(newWorld)
+		//fmt.Println(aliveCells)
 
 		for i := 0; i < p.ImageHeight; i++ {
 			for j := 0; j < p.ImageWidth; j++ {
 				if inputWorld[i][j] != newWorld[i][j] {
-					c.events <- CellFlipped{turn, util.Cell{i, j}}
+					c.events <- CellFlipped{turn, util.Cell{j, i}}
 				}
 			}
 		}
 		c.events <- TurnComplete{turn}
 
 		inputWorld = newWorld
-		aliveCells = getAliveCellsCount(inputWorld)
 
 	}
 	//We make a stripSizeArray to
