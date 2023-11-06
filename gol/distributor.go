@@ -134,8 +134,7 @@ func distributeSliceSizes(stripSize, threads, imageHeight int) []int {
 
 // creates the strip that the worker will operate on
 // currentHeight is pass by reference so that it will update for the next worker
-func createStrip(world [][]byte, stripSizeList []int, workerNumber, imageHeight, threads int,
-	currentHeight *int) [][]byte {
+func createStrip(world [][]byte, stripSizeList []int, workerNumber, imageHeight, threads int) [][]byte {
 	var topBuffer int
 	var endBuffer int
 	var startIndex int
@@ -143,28 +142,31 @@ func createStrip(world [][]byte, stripSizeList []int, workerNumber, imageHeight,
 	//We initialize the strip
 	var strip [][]byte
 
+	//We exploit the fact that every strip size but the last one is the same so we can just precalcualte the currentY
+	//cordinate locally
+	var normalStripSize int = stripSizeList[0]
+	currentY := (normalStripSize) * workerNumber
+
 	if workerNumber == 0 { //starting worker
 		topBuffer = imageHeight - 1
 		startIndex = 0
-		endBuffer = (*currentHeight) + stripSizeList[workerNumber]
+		endBuffer = stripSizeList[0] //first worker
 
-		(*currentHeight) += stripSizeList[workerNumber]
 		strip = append(strip, world[topBuffer])
 		strip = append(strip, world[startIndex:endBuffer+1]...)
 	} else if workerNumber == threads-1 { //final worker
 
-		topBuffer = (*currentHeight) - 1
-		startIndex = (*currentHeight)
+		topBuffer = currentY - 1
+		startIndex = currentY
 		endBuffer = 0
 
 		strip = append(strip, world[topBuffer:imageHeight]...)
 		strip = append(strip, world[0])
 	} else { //middle workers
-		topBuffer = (*currentHeight) - 1
-		startIndex = (*currentHeight)
-		endBuffer = (*currentHeight) + stripSizeList[workerNumber]
+		topBuffer = currentY - 1
+		startIndex = currentY
+		endBuffer = currentY + normalStripSize
 
-		(*currentHeight) += stripSizeList[workerNumber]
 		strip = append(strip, world[topBuffer:endBuffer+1]...)
 	}
 
@@ -260,15 +262,12 @@ func distributor(p Params, c distributorChannels) {
 				workerChannelList[j] = workerChannel
 			}
 
-			//We increment this variable per worker to change the height
-			//Workers are created sequentially so this variable being mutable is safe
-			currentHeight := 0
 			//We now do split the input world for each thread accordingly
 			for j := 0; j < p.Threads; j++ {
 				waitGroup.Add(1)
 
 				var strip [][]byte = createStrip(inputWorld, stripSizeList,
-					j, p.ImageHeight, p.Threads, &currentHeight)
+					j, p.ImageHeight, p.Threads)
 				go manager((stripSizeList[j])+2, p.ImageWidth, strip, workerChannelList[j],
 					&waitGroup, j)
 
