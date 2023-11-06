@@ -236,6 +236,16 @@ func distributor(p Params, c distributorChannels) {
 
 	}()
 
+	//We flip the cells
+	for i := 0; i < p.ImageHeight; i++ {
+		for j := 0; j < p.ImageWidth; j++ {
+			if inputWorld[i][j] == LIVE {
+				c.events <- CellFlipped{turn, util.Cell{i, j}}
+			}
+		}
+	}
+	c.events <- TurnComplete{turn}
+
 	//Run the GoL algorithm for specificed number of turns
 	for i := 0; i < p.Turns; i++ {
 		var newWorld [][]byte
@@ -275,9 +285,19 @@ func distributor(p Params, c distributorChannels) {
 				newWorld = append(newWorld, worldSection[1:endBufferIndex]...)
 			}
 		}
+		turn++
+
+		for i := 0; i < p.ImageHeight; i++ {
+			for j := 0; j < p.ImageWidth; j++ {
+				if inputWorld[i][j] != newWorld[i][j] {
+					c.events <- CellFlipped{turn, util.Cell{i, j}}
+				}
+			}
+		}
+		c.events <- TurnComplete{turn}
+
 		inputWorld = newWorld
 		aliveCells = getAliveCellsCount(inputWorld)
-		turn++
 
 	}
 	//We make a stripSizeArray to
