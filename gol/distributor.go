@@ -9,9 +9,12 @@ import (
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
-//We make consts as stand ins for alive or dead
+// LIVE We make constants as stand-ins for alive or dead
 const LIVE = 255
 const DEAD = 0
+
+// BUFFER We make a const for a buffer size stand in
+const BUFFER = 2
 
 type distributorChannels struct {
 	events    chan<- Event
@@ -23,13 +26,13 @@ type distributorChannels struct {
 	ioInput    <-chan byte
 }
 
-//Helper function to distributor to find the number of alive cells adjancent to the tile
+//Helper function to distributor to find the number of alive cells adjacent to the tile
 func calculateAliveCells(world [][]byte) []util.Cell {
 	var coordinates []util.Cell
 	for index, row := range world {
 		for index2 := range row {
 			if world[index][index2] > 0 {
-				coordinates = append(coordinates, util.Cell{index2, index})
+				coordinates = append(coordinates, util.Cell{X: index2, Y: index})
 			}
 		}
 	}
@@ -40,7 +43,7 @@ func calculateAliveCells(world [][]byte) []util.Cell {
 //Return list of slice sizes
 func distributeSliceSizes(p Params) []int {
 
-	var stripSize int = int(math.Ceil(float64(p.ImageHeight / p.Threads)))
+	var stripSize = int(math.Ceil(float64(p.ImageHeight / p.Threads)))
 	stripSizeList := make([]int, p.Threads) //Each index is the strip size for the specific worker
 
 	if (stripSize*p.Threads)-p.ImageHeight == stripSize {
@@ -75,9 +78,9 @@ func createStrip(world [][]byte, stripSizeList []int, workerNumber, imageHeight,
 	//We initialize the strip
 	var strip [][]byte
 
-	//We exploit the fact that every strip size but the last one is the same so we can just precalcualte the currentY
-	//cordinate locally
-	var normalStripSize int = stripSizeList[0]
+	//We exploit the fact that every strip size but the last one is the same, so we can just precalculate the currentY
+	//coordinate locally
+	var normalStripSize = stripSizeList[0]
 	currentY := (normalStripSize) * workerNumber
 
 	if workerNumber == 0 { //starting worker
@@ -117,10 +120,9 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 	imageHeight,
 	threads,
 	workerNumber int, waitGroup *sync.WaitGroup) {
-	var strip [][]byte = createStrip(inputWorld, stripSizeList,
+	var strip = createStrip(inputWorld, stripSizeList,
 		workerNumber, imageHeight, threads)
-	//Add +2 to account for top and bottom buffer
-	var workerStripSize int = (stripSizeList[workerNumber]) + 2
+	var workerStripSize = (stripSizeList[workerNumber]) + BUFFER
 	manager(workerStripSize, imageWidth, strip,
 		workerChannelList[workerNumber])
 	defer (*waitGroup).Done()
@@ -151,7 +153,7 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 			if key == 's' {
 				//When s is pressed, we need to generate a PGM file with the current state of the board
 
-				var filename string = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.
+				var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.
 					Itoa(turns)
 				writeToFileIO(inputWorld, p, filename, c)
 			} else if key == 'p' {
@@ -186,18 +188,18 @@ func aliveCellsReporter(turn, aliveCells *int, ticker *time.Ticker, c distributo
 	for {
 		select {
 		case <-ticker.C:
-			c.events <- AliveCellsCount{(*turn), (*aliveCells)}
+			c.events <- AliveCellsCount{*turn, *aliveCells}
 		}
 	}
 }
 
 //Helper function of distributor
-//We use this to change color of the cells in SDL GUI (this flip intializes drawing)
+//We use this to change color of the cells in SDL GUI (this flip initializes drawing)
 func flipWorldCellsInitial(world [][]byte, imageHeight, imageWidth, turn int, c distributorChannels) {
 	for i := 0; i < imageHeight; i++ {
 		for j := 0; j < imageWidth; j++ {
 			if world[i][j] == LIVE {
-				c.events <- CellFlipped{turn, util.Cell{j, i}}
+				c.events <- CellFlipped{CompletedTurns: turn, Cell: util.Cell{X: j, Y: i}}
 			}
 		}
 	}
@@ -210,7 +212,7 @@ func flipWorldCellsIteration(oldWorld, newWorld [][]byte, turn, imageHeight, ima
 		for j := 0; j < imageWidth; j++ {
 			//If the cell has changed since the last iteration, we need to send an event to say so
 			if oldWorld[i][j] != newWorld[i][j] {
-				c.events <- CellFlipped{turn, util.Cell{j, i}}
+				c.events <- CellFlipped{CompletedTurns: turn, Cell: util.Cell{X: j, Y: i}}
 			}
 		}
 	}
@@ -221,7 +223,7 @@ func flipWorldCellsIteration(oldWorld, newWorld [][]byte, turn, imageHeight, ima
 //We merge worker strips into one world [][]byte (we also remove buffers from each worker as well)
 func mergeWorkerStrips(newWorld [][]byte, workerChannelList []chan [][]byte, stripSizeList []int) [][]byte {
 	for i := 0; i < len(workerChannelList); i++ {
-		//worldSection is just a gameslice from a specific worker
+		//worldSection is just a game slice from a specific worker
 		worldSection := <-(workerChannelList[i])
 		endBufferIndex := stripSizeList[i] + 1
 
@@ -236,7 +238,7 @@ func mergeWorkerStrips(newWorld [][]byte, workerChannelList []chan [][]byte, str
 //Performs necessary logic to end the game neatly
 func handleGameShutDown(world [][]byte, p Params, turns int, c distributorChannels,
 	ticker *time.Ticker) {
-	var filename string = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(turns)
+	var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(turns)
 
 	writeToFileIO(world, p, filename, c)
 
@@ -253,12 +255,12 @@ func handleGameShutDown(world [][]byte, p Params, turns int, c distributorChanne
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
-	var turn int = 0
-	var aliveCells int = 0
-	var inputWorld [][]byte = writeFromFileIO(p.ImageHeight, p.ImageWidth, c)
+	var turn = 0
+	var aliveCells = 0
+	var inputWorld = writeFromFileIO(p.ImageHeight, p.ImageWidth, c)
 
 	//We need to find the strip sized passed to each worker
-	var stripSizeList []int = distributeSliceSizes(p)
+	var stripSizeList = distributeSliceSizes(p)
 
 	aliveCells = getAliveCellsCount(inputWorld)
 	//We create a ticker
@@ -267,15 +269,15 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	//We report the alive cells every two secs
 	go aliveCellsReporter(&turn, &aliveCells, aliveCellsTicker, c)
 
-	var turnChannel chan int = make(chan int)
-	var pauseChannel chan bool = make(chan bool)
-	//Keep track of any keypresses by the user
+	var turnChannel = make(chan int)
+	var pauseChannel = make(chan bool)
+	//Keep track of any key presses by the user
 	go goPressTrack(inputWorld, keyPresses, c, p, turnChannel, aliveCellsTicker, pauseChannel)
 
 	//We flip the cells
 	flipWorldCellsInitial(inputWorld, p.ImageHeight, p.ImageWidth, turn, c)
 
-	//Run the GoL algorithm for specificed number of turns
+	//Run the GoL algorithm for specified number of turns
 	for i := 0; i < p.Turns; i++ {
 		var newWorld [][]byte
 		if p.Threads == 1 {
@@ -283,9 +285,9 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		} else {
 			//	We need to make a wait group and communication channels for each strip
 			var waitGroup sync.WaitGroup
-			var workerChannelList []chan [][]byte = make([]chan [][]byte, p.Threads)
+			var workerChannelList = make([]chan [][]byte, p.Threads)
 			for j := 0; j < p.Threads; j++ {
-				var workerChannel chan [][]byte = make(chan [][]byte, 2)
+				var workerChannel = make(chan [][]byte, 2)
 				workerChannelList[j] = workerChannel
 			}
 			//We now do split the input world for each thread accordingly

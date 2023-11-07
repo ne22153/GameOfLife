@@ -19,11 +19,12 @@ func BenchmarkFilter(b *testing.B) {
 		b.Run(fmt.Sprintf("%d_workers", threads), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 
-				var params gol.Params
-				params.Threads = threads
-				params.ImageWidth = 512
-				params.ImageHeight = 512
-				params.Turns = 1000
+				params := gol.Params{
+					Turns:       1000,
+					Threads:     threads,
+					ImageWidth:  512,
+					ImageHeight: 512,
+				}
 
 				keyPresses := make(chan rune, 10)
 				events := make(chan gol.Event, 1000)
@@ -37,16 +38,6 @@ func BenchmarkFilter(b *testing.B) {
 						complete = true
 					}
 				}
-
-				/*params.ImageWidth = 64
-				params.ImageHeight = 64
-				go gol.Run(params, events, keyPresses)
-				sdl.Run(params, events, keyPresses)
-
-				params.ImageWidth = 16
-				params.ImageHeight = 16
-				go gol.Run(params, events, keyPresses)
-				sdl.Run(params, events, keyPresses)*/
 			}
 		})
 	}
