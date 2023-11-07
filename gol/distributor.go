@@ -300,11 +300,11 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 			newWorld = mergeWorkerStrips(newWorld, workerChannelList, stripSizeList)
 		}
+		aliveCells = getAliveCellsCount(newWorld)
 		turn++
 		turnChannel <- turn
 
 		//Update alive cells
-		aliveCells = getAliveCellsCount(newWorld)
 		<-pauseChannel
 
 		flipWorldCellsIteration(inputWorld, newWorld, turn, p.ImageHeight, p.ImageHeight, c)
