@@ -24,10 +24,10 @@ type distributorChannels struct {
 }
 
 //Helper function to distributor to find the number of alive cells adjancent to the tile
-func calculateAliveCells(p Params, world [][]byte) []util.Cell {
-	coordinates := []util.Cell{}
+func calculateAliveCells(world [][]byte) []util.Cell {
+	var coordinates []util.Cell
 	for index, row := range world {
-		for index2, _ := range row {
+		for index2 := range row {
 			if world[index][index2] > 0 {
 				coordinates = append(coordinates, util.Cell{index2, index})
 			}
@@ -36,33 +36,29 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	return coordinates
 }
 
-func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte) {
-	gameSlice := worker(imageHeight, imageWidth, inputWorld)
-	out <- gameSlice
-}
-
 //Determine how big the slice of the GoL board that the worker will work on.
 //Return list of slice sizes
-func distributeSliceSizes(stripSize, threads, imageHeight int) []int {
-	stripSizeList := make([]int, threads) //Each index is the strip size for the specific worker
+func distributeSliceSizes(p Params) []int {
 
-	if (stripSize*threads)-imageHeight == stripSize {
+	var stripSize int = int(math.Ceil(float64(p.ImageHeight / p.Threads)))
+	stripSizeList := make([]int, p.Threads) //Each index is the strip size for the specific worker
+
+	if (stripSize*p.Threads)-p.ImageHeight == stripSize {
 		stripSize--
 	}
 
 	sum := 0
-	for i, _ := range stripSizeList {
+	for i := range stripSizeList {
 		stripSizeList[i] = stripSize
 		sum += stripSize
 	}
 
 	//We adjust the final worker's slice size to fit to the pixels
-	if sum > imageHeight { //if sum is more than height
-		difference := sum - imageHeight
+	if sum > p.ImageHeight { //if sum is more than height
+		difference := sum - p.ImageHeight
 		stripSizeList[len(stripSizeList)-1] -= difference
-	} else if imageHeight > sum { //if sum is less the same as height
-		difference := imageHeight - sum
-		//fmt.Println("difference: ", difference)
+	} else if p.ImageHeight > sum { //if sum is less the same as height
+		difference := p.ImageHeight - sum
 		stripSizeList[len(stripSizeList)-1] += difference
 	}
 
@@ -110,6 +106,26 @@ func createStrip(world [][]byte, stripSizeList []int, workerNumber, imageHeight,
 	return strip
 }
 
+func manager(imageHeight int, imageWidth int, inputWorld [][]byte, out chan<- [][]byte) {
+	gameSlice := worker(imageHeight, imageWidth, inputWorld)
+	out <- gameSlice
+}
+
+//Helper function of distributor
+//Creates a strip for the worker and then the worker will perform GoL algorithm on such strip
+func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, stripSizeList []int, imageWidth,
+	imageHeight,
+	threads,
+	workerNumber int, waitGroup *sync.WaitGroup) {
+	var strip [][]byte = createStrip(inputWorld, stripSizeList,
+		workerNumber, imageHeight, threads)
+	//Add +2 to account for top and bottom buffer
+	var workerStripSize int = (stripSizeList[workerNumber]) + 2
+	manager(workerStripSize, imageWidth, strip,
+		workerChannelList[workerNumber])
+	defer (*waitGroup).Done()
+}
+
 func getAliveCellsCount(inputWorld [][]byte) int {
 	aliveCells := 0
 
@@ -125,7 +141,8 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 }
 
 //Manages the key press interrupts
-func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChannels, p Params, turn chan int, aliveCellsTicker *time.Ticker, pauseChannel chan bool) {
+func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChannels, p Params, turn chan int,
+	aliveCellsTicker *time.Ticker, pauseChannel chan bool) {
 	var turns = 0
 	var paused = false
 	for {
@@ -136,7 +153,7 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 
 				var filename string = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.
 					Itoa(turns)
-				writeToFileIO(inputWorld, p.ImageHeight, p.ImageWidth, turns, filename, c)
+				writeToFileIO(inputWorld, p, filename, c)
 			} else if key == 'p' {
 				//When p is pressed, pause the processing and print the current turn that is being processed
 				//If p is pressed again resume the processing
@@ -151,7 +168,7 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 
 			} else if key == 'q' {
 				//When q is pressed, generate a PGM file with the current state of the board then terminate
-				handleGameShutDown(inputWorld, p.ImageHeight, p.ImageWidth, turns, c, aliveCellsTicker)
+				handleGameShutDown(inputWorld, p, turns, c, aliveCellsTicker)
 				//Exit the program
 				os.Exit(0)
 			}
@@ -165,38 +182,6 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 	}
 }
 
-//Helper function of distributor. We use this to create an initial world map from a file name
-func writeFromFileIO(imageHeight, imageWidth int, c distributorChannels) [][]byte {
-
-	//We create the worlds
-	var world [][]byte = make([][]byte, imageHeight)
-	for i := 0; i < imageHeight; i++ {
-		world[i] = make([]byte, imageWidth)
-	}
-
-	//We set the command to input to be able to read from the file
-	c.ioFilename <- strconv.Itoa(imageWidth) + "x" + strconv.Itoa(imageHeight)
-	c.ioCommand <- ioInput
-
-	for i := 0; i < imageHeight; i++ {
-		for j := 0; j < imageWidth; j++ {
-			//We populate the slice one input at a time.
-			world[i][j] = <-(c.ioInput)
-		}
-	}
-
-	return world
-}
-func writeToFileIO(world [][]byte, imageHeight, imageWidth, turns int, filename string,
-	c distributorChannels) {
-	c.ioCommand <- ioOutput
-	c.ioFilename <- filename
-	for i := 0; i < imageHeight; i++ {
-		for j := 0; j < imageWidth; j++ {
-			c.ioOutput <- world[i][j]
-		}
-	}
-}
 func aliveCellsReporter(turn, aliveCells *int, ticker *time.Ticker, c distributorChannels) {
 	for {
 		select {
@@ -250,11 +235,11 @@ func mergeWorkerStrips(newWorld [][]byte, workerChannelList []chan [][]byte, str
 
 //Helper function of distributor
 //Performs necessary logic to end the game neatly
-func handleGameShutDown(world [][]byte, imageHeight, imageWidth, turns int, c distributorChannels,
+func handleGameShutDown(world [][]byte, p Params, turns int, c distributorChannels,
 	ticker *time.Ticker) {
-	var filename string = strconv.Itoa(imageWidth) + "x" + strconv.Itoa(imageHeight) + "x" + strconv.Itoa(turns)
+	var filename string = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(turns)
 
-	writeToFileIO(world, imageHeight, imageWidth, turns, filename, c)
+	writeToFileIO(world, p, filename, c)
 
 	//Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
@@ -274,8 +259,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	var inputWorld [][]byte = writeFromFileIO(p.ImageHeight, p.ImageWidth, c)
 
 	//We need to find the strip sized passed to each worker
-	var stripSize int = int(math.Ceil(float64(p.ImageHeight / p.Threads)))
-	var stripSizeList []int = distributeSliceSizes(stripSize, p.Threads, p.ImageHeight)
+	var stripSizeList []int = distributeSliceSizes(p)
 
 	aliveCells = getAliveCellsCount(inputWorld)
 	//We create a ticker
@@ -305,21 +289,13 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 				var workerChannel chan [][]byte = make(chan [][]byte, 2)
 				workerChannelList[j] = workerChannel
 			}
-
 			//We now do split the input world for each thread accordingly
 			for j := 0; j < p.Threads; j++ {
 				waitGroup.Add(1)
-
-				go func(workerNumber int) {
-					//fmt.Println("Processed worker: ", workerNumber)
-					var strip [][]byte = createStrip(inputWorld, stripSizeList,
-						workerNumber, p.ImageHeight, p.Threads)
-					//Add +2 to account for top and bottom buffer
-					var workerStripSize int = (stripSizeList[workerNumber]) + 2
-					manager(workerStripSize, p.ImageWidth, strip,
-						workerChannelList[workerNumber])
-					defer waitGroup.Done()
-				}(j)
+				//We execute the workers concurrently
+				go executeWorker(inputWorld, workerChannelList,
+					stripSizeList, p.ImageHeight, p.ImageWidth, p.Threads, j,
+					&waitGroup)
 			}
 			waitGroup.Wait()
 
@@ -333,11 +309,9 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		<-pauseChannel
 
 		flipWorldCellsIteration(inputWorld, newWorld, turn, p.ImageHeight, p.ImageHeight, c)
-
 		inputWorld = newWorld
 	}
 
-	c.events <- FinalTurnComplete{turn, calculateAliveCells(p, inputWorld)}
-
-	handleGameShutDown(inputWorld, p.ImageHeight, p.ImageWidth, p.Turns, c, aliveCellsTicker)
+	c.events <- FinalTurnComplete{turn, calculateAliveCells(inputWorld)}
+	handleGameShutDown(inputWorld, p, p.Turns, c, aliveCellsTicker)
 }
