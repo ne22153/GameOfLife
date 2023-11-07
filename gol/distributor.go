@@ -189,7 +189,6 @@ func aliveCellsReporter(turn, aliveCells *int, ticker *time.Ticker, c distributo
 			c.events <- AliveCellsCount{(*turn), (*aliveCells)}
 		}
 	}
-
 }
 
 //Helper function of distributor
