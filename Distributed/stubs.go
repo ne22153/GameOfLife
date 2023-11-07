@@ -1,12 +1,11 @@
 package Distributed
 
-var ReverseHandler = "SecretStringOperations.Reverse"
-var PremiumReverseHandler = "SecretStringOperations.FastReverse"
+var GoLHandler = "GoL.FastReverse"
 
 type Response struct {
-	Message string
+	World [][]byte
 }
 
 type Request struct {
-	Message string
+	World [][]byte
 }

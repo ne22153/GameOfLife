@@ -6,29 +6,17 @@ import (
 	"net"
 	"net/rpc"
 	"time"
-	//"uk.ac.bris.cs/distributed2/secretstrings/stubs"
-	//"Distributed/stubs"
 )
 
-/** Super-Secret `reversing a string' method we can't allow clients to see. **/
-func ReverseString(s string, i int) string {
-	time.Sleep(time.Duration(rand.Intn(i)) * time.Second)
-	runes := []rune(s)
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-	return string(runes)
+//Does the actual working stuff
+func GoLWorker(s [][]byte, i int) [][]byte {
+	return make([][]byte, 0)
 }
 
-type SecretStringOperations struct{}
+type GoLOperations struct{}
 
-func (s *SecretStringOperations) Reverse(req Request, res *Response) (err error) {
-	res.Message = ReverseString(req.Message, 10)
-	return
-}
-
-func (s *SecretStringOperations) FastReverse(req Request, res *Response) (err error) {
-	res.Message = ReverseString(req.Message, 2)
+func (s *GoLOperations) GoLManager(req Request, res *Response) (err error) {
+	res.World = GoLWorker(req.World, 2)
 	return
 }
 
@@ -36,7 +24,7 @@ func main() {
 	pAddr := flag.String("port", "8030", "Port to listen on")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
-	rpc.Register(&SecretStringOperations{})
+	rpc.Register(&GoLOperations{})
 	listener, _ := net.Listen("tcp", ":"+*pAddr)
 	defer listener.Close()
 	rpc.Accept(listener)
