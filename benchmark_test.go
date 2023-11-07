@@ -29,6 +29,24 @@ func BenchmarkFilter(b *testing.B) {
 				events := make(chan gol.Event, 1000)
 
 				go gol.Run(params, events, keyPresses)
+				complete := false
+				for !complete {
+					event := <-events
+					switch event.(type) {
+					case gol.FinalTurnComplete:
+						complete = true
+					}
+				}
+
+				/*params.ImageWidth = 64
+				params.ImageHeight = 64
+				go gol.Run(params, events, keyPresses)
+				sdl.Run(params, events, keyPresses)
+
+				params.ImageWidth = 16
+				params.ImageHeight = 16
+				go gol.Run(params, events, keyPresses)
+				sdl.Run(params, events, keyPresses)*/
 			}
 		})
 	}
