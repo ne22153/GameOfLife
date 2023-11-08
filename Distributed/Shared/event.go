@@ -1,4 +1,4 @@
-package Distributed
+package Shared
 
 import (
 	"fmt"

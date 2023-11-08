@@ -165,39 +165,39 @@ There is a modified version of the test file available [here](https://seis.brist
 
 Begin by ensuring you have a working single-threaded, single-machine implementation. You should be able to test your serial code using `go test -v -run=TestGol/-1$` and all tests should pass.
 
-Separate your implementation into two components. One component, the local controller, will be responsible for IO and capturing keypresses. The second component, the GOL Engine, will be responsible for actually processing the turns of Game of Life. You must be able to run the local controller as a client on a local machine, and the GoL engine as a server on an AWS node.
+Separate your implementation into two components. One component, the local Controller, will be responsible for IO and capturing keypresses. The second component, the GOL Engine, will be responsible for actually processing the turns of Game of Life. You must be able to run the local Controller as a client on a local machine, and the GoL engine as a server on an AWS node.
 
-Start by implementing a basic controller which can tell the logic engine to evolve Game of Life for the number of turns specified in `gol.Params.Turns`. You can achieve this by implementing a single, blocking RPC call to process all requested turns.
+Start by implementing a basic Controller which can tell the logic engine to evolve Game of Life for the number of turns specified in `gol.Params.Turns`. You can achieve this by implementing a single, blocking RPC call to process all requested turns.
 
-Test your implementation using `go test -v -run=TestGol/-1$` *on the controller*.
+Test your implementation using `go test -v -run=TestGol/-1$` *on the Controller*.
 
 
 ### Step 2
 
 ![Step 2](content/cw_diagrams-Distributed_2.png)
 
-You should report the number of cells that are still alive *every 2 seconds* to the local controller (it is anticipated that you will run a ticker on the local controller and make an RPC call to the AWS node / worker / broker every 2 seconds). The controller should then send an `AliveCellsCount` event to the `events` channel.  
+You should report the number of cells that are still alive *every 2 seconds* to the local Controller (it is anticipated that you will run a ticker on the local Controller and make an RPC call to the AWS node / worker / broker every 2 seconds). The Controller should then send an `AliveCellsCount` event to the `events` channel.  
 
-Test your implementation using `go test -v -run=TestAlive` *on the controller*.
+Test your implementation using `go test -v -run=TestAlive` *on the Controller*.
 
 ### Step 3
 
 ![Step 3](content/cw_diagrams-Distributed_3.png)
 
-The local controller should be able to output the state of the board after all turns have completed as a PGM image. 
+The local Controller should be able to output the state of the board after all turns have completed as a PGM image. 
 
-Test your implementation using `go test -v -run=TestPgm/-1$` *on the controller*.
+Test your implementation using `go test -v -run=TestPgm/-1$` *on the Controller*.
 
 ### Step 4
 
 ![Step 4](content/cw_diagrams-Distributed_4.png)
 
-Finally, the local controller should be able to manage the behaviour of the GoL engine according to the following rules: 
+Finally, the local Controller should be able to manage the behaviour of the GoL engine according to the following rules: 
 
-- If `s` is pressed, the controller should generate a PGM file with the current state of the board.
-- If `q` is pressed, close the controller client program without causing an error on the GoL server. A new controller should be able to take over interaction with the GoL engine. Note that you are free to define the nature of how a new controller can take over interaction. Most likely the state will be reset. If you do manage to continue with the previous world this would be considered an extension and a form of fault tolerance.
+- If `s` is pressed, the Controller should generate a PGM file with the current state of the board.
+- If `q` is pressed, close the Controller client program without causing an error on the GoL server. A new Controller should be able to take over interaction with the GoL engine. Note that you are free to define the nature of how a new Controller can take over interaction. Most likely the state will be reset. If you do manage to continue with the previous world this would be considered an extension and a form of fault tolerance.
 - If `k` is pressed, all components of the distributed system are shut down cleanly, and the system outputs a PGM image of the latest state.
-- If `p` is pressed, pause the processing *on the AWS node* and have the *controller* print the current turn that is being processed. If `p` is pressed again resume the processing and have the controller print `"Continuing"`. It is *not* necessary for `q` and `s` to work while the execution is paused.
+- If `p` is pressed, pause the processing *on the AWS node* and have the *Controller* print the current turn that is being processed. If `p` is pressed again resume the processing and have the Controller print `"Continuing"`. It is *not* necessary for `q` and `s` to work while the execution is paused.
 
 Test the control rules by running `go run .`.
 
@@ -231,7 +231,7 @@ Reducing coupling between the "Local Controller" and the "GOL workers" is desira
 - Pass all tests.
 - Output the correct PGM images.
 - Ensure the keyboard control rules work as needed.
-- At minimum, the controller and the Game of Life engine should be separate
+- At minimum, the Controller and the Game of Life engine should be separate
   components running on different machines (as per Step 2 above) and
 communicating.
 - To fully satisfy the criteria your implementation should use multiple AWS nodes efficiently.
@@ -270,7 +270,7 @@ Analyse the performance of your new solution and compare it with your previous i
 
 ### SDL Live View of Distributed Implementation
 
-Instead of showing a blank SDL window in your local controller, add support for a Live View, in a similar way to the parallel implementation. Try to keep your implementation as efficient as possible.
+Instead of showing a blank SDL window in your local Controller, add support for a Live View, in a similar way to the parallel implementation. Try to keep your implementation as efficient as possible.
 
 Analyse the performance of your new solution and compare it with your previous implementation. Quantify and explain the overhead (if any) added by the Live View.
 
@@ -308,7 +308,7 @@ Additional marks are available for satisfying further success criteria, up to:
 
 ### Distributed Implementation (35 marks)
 
-40% - You must be able to demonstrate a distributed Game of Life implementation. It must be running a single AWS GoL Engine Node that is controlled by a locally running controller (see Step 1).
+40% - You must be able to demonstrate a distributed Game of Life implementation. It must be running a single AWS GoL Engine Node that is controlled by a locally running Controller (see Step 1).
 
 70% - Satisfy *all* success criteria for this stage.
 

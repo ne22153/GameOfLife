@@ -1,4 +1,4 @@
-package Distributed
+package Controller
 
 import (
 	"fmt"
@@ -6,11 +6,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
-type ioChannels struct {
-	command <-chan ioCommand
+type IoChannels struct {
+	command <-chan IoCommand
 	idle    chan<- bool
 
 	filename <-chan string
@@ -19,13 +20,13 @@ type ioChannels struct {
 }
 
 // ioState is the internal ioState of the io goroutine.
-type ioState struct {
-	params   Params
-	channels ioChannels
+type IoState struct {
+	params   Shared.Params
+	channels IoChannels
 }
 
 // ioCommand allows requesting behaviour from the io (pgm) goroutine.
-type ioCommand uint8
+type IoCommand uint8
 
 // This is a way of creating enums in Go.
 // It will evaluate to:
@@ -33,13 +34,13 @@ type ioCommand uint8
 //		ioInput 	= 1
 //		ioCheckIdle = 2
 const (
-	ioOutput ioCommand = iota
+	ioOutput IoCommand = iota
 	ioInput
 	ioCheckIdle
 )
 
 // writePgmImage receives an array of bytes and writes it to a pgm file.
-func (io *ioState) writePgmImage() {
+func (io *IoState) writePgmImage() {
 	_ = os.Mkdir("out", os.ModePerm)
 
 	// Request a filename from the distributor.
@@ -87,13 +88,13 @@ func (io *ioState) writePgmImage() {
 }
 
 // readPgmImage opens a pgm file and sends its data as an array of bytes.
-func (io *ioState) readPgmImage() {
+func (io *IoState) readPgmImage() {
 
 	// Request a filename from the distributor.
 	filename := <-io.channels.filename
 	fmt.Println(filename)
 
-	data, ioError := ioutil.ReadFile("images/" + filename + ".pgm")
+	data, ioError := ioutil.ReadFile("../../check/images/" + filename + ".pgm")
 	util.Check(ioError)
 	fmt.Println("File read")
 	fields := strings.Fields(string(data))
@@ -129,8 +130,8 @@ func (io *ioState) readPgmImage() {
 }
 
 // startIo should be the entrypoint of the io goroutine.
-func startIo(p Params, c ioChannels) {
-	io := ioState{
+func startIo(p Shared.Params, c IoChannels) {
+	io := IoState{
 		params:   p,
 		channels: c,
 	}

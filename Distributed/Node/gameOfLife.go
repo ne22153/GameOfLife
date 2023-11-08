@@ -1,4 +1,4 @@
-package Distributed
+package main
 
 const LIVE = 255
 const DEAD = 0
