@@ -6,7 +6,7 @@ import (
 )
 
 //Helper function of distributor. We use this to create an initial world map from a file name
-func WriteFromFileIO(imageHeight, imageWidth int, c DistributorChannels, turns int) [][]byte {
+func WriteFromFileIO(imageHeight, imageWidth int, c DistributorChannels) [][]byte {
 
 	//We create the worlds
 	var world [][]byte = make([][]byte, imageHeight)
