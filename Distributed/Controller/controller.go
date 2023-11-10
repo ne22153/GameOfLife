@@ -41,7 +41,9 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	callError := client.Call(Shared.GoLHandler, request, response)
 	Shared.HandleError(callError)
 
-	channels.events <- Shared.FinalTurnComplete{CompletedTurns: params.Turns}
+	channels.events <- Shared.FinalTurnComplete{
+		CompletedTurns: params.Turns,
+		Alive:          calculateAliveCells(response.World)}
 	close(channels.events)
 	//fmt.Println("Responded: ", response.World)
 }
