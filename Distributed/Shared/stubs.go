@@ -1,5 +1,7 @@
 package Shared
 
+import "log"
+
 // Params provides the details of how to run the Game of Life and which image to load.
 type Params struct {
 	Turns       int
@@ -18,4 +20,10 @@ type Response struct {
 type Request struct {
 	World      [][]byte
 	Parameters Params
+}
+
+func HandleError(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
 }
