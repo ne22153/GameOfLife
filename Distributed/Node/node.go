@@ -20,13 +20,13 @@ func GoLWorker(inputWorld [][]byte, p Shared.Params) [][]byte {
 		}
 		return inputWorld
 	}
-	for i := 0; i < p.Turns-1; i++ {
-		if p.ImageWidth == 16 && p.Turns < 10 {
+	for i := 0; i < p.Turns; i++ {
+		if p.ImageWidth == 16 {
 			fmt.Println("Turn number: ", i-1, " World: ", inputWorld)
 		}
 		newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
 		inputWorld = newWorld
-		if p.ImageWidth == 16 && p.Turns < 10 {
+		if p.ImageWidth == 16 {
 			fmt.Println("Turn number: ", i, " World: ", inputWorld)
 		}
 	}

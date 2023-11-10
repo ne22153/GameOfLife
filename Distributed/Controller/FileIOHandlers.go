@@ -15,7 +15,7 @@ func WriteFromFileIO(imageHeight, imageWidth int, c DistributorChannels, turns i
 	}
 
 	//We set the command to input to be able to read from the file
-	c.ioFilename <- strconv.Itoa(imageWidth) + "x" + strconv.Itoa(imageHeight) + "x" + strconv.Itoa(turns)
+	c.ioFilename <- strconv.Itoa(imageWidth) + "x" + strconv.Itoa(imageHeight) + "x0"
 	c.ioCommand <- ioInput
 
 	for i := 0; i < imageHeight; i++ {
