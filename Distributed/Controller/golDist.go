@@ -1,6 +1,7 @@
 package Controller
 
 import (
+	"fmt"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 	//main2 "uk.ac.bris.cs/gameoflife/Distributed/Controller"
 )
@@ -18,9 +19,7 @@ func Run(p Shared.Params, events chan<- Shared.Event, keyPresses <-chan rune) {
 
 	//	TODO: Put the missing channels in here.
 
-	if (p.ServerPort) != "" {
-		p.ServerPort = "127.0.0.1:8030"
-	}
+	p.ServerPort = "127.0.0.1:8030"
 
 	ioCommand := make(chan IoCommand)
 	ioIdle := make(chan bool)
@@ -46,4 +45,5 @@ func Run(p Shared.Params, events chan<- Shared.Event, keyPresses <-chan rune) {
 		ioInput:    ioInput,
 	}
 	controller(p, distributorChannels, keyPresses)
+	fmt.Println("Finished for real")
 }

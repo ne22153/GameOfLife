@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"uk.ac.bris.cs/gameoflife/gol"
-
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -36,12 +34,14 @@ func TestGol(t *testing.T) {
 					var cells []util.Cell
 					for event := range events {
 						switch e := event.(type) {
-						case gol.FinalTurnComplete:
+						case Shared.FinalTurnComplete:
 							cells = e.Alive
 						}
 					}
+
 					assertEqualBoard(t, cells, expectedAlive, p)
 				})
+
 			}
 		}
 	}

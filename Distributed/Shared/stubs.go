@@ -20,6 +20,7 @@ type Response struct {
 type Request struct {
 	World      [][]byte
 	Parameters Params
+	Events     chan<- Event
 }
 
 func HandleError(err error) {

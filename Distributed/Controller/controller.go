@@ -26,8 +26,6 @@ type DistributorChannels struct {
 }
 
 func controller(params Shared.Params, channels DistributorChannels, keyPresses <-chan rune) {
-	fmt.Println(params.ServerPort)
-
 	fmt.Println("Serverport", params.ServerPort)
 	client, dialError := rpc.Dial("tcp", params.ServerPort)
 	Shared.HandleError(dialError)
@@ -38,12 +36,14 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	}(client)
 
 	//Forms the request which contains the [][]byte version of the PGM file
-	request := Shared.Request{World: WriteFromFileIO(params.ImageHeight, params.ImageWidth, channels, params.Turns), Parameters: params}
+	request := Shared.Request{World: WriteFromFileIO(params.ImageHeight, params.ImageWidth, channels, params.Turns), Parameters: params, Events: channels.events}
 	response := new(Shared.Response)
 	callError := client.Call(Shared.GoLHandler, request, response)
 	Shared.HandleError(callError)
 
-	fmt.Println("Responded: ", response.World)
+	channels.events <- Shared.FinalTurnComplete{CompletedTurns: params.Turns}
+	close(channels.events)
+	//fmt.Println("Responded: ", response.World)
 }
 
 func main() {
