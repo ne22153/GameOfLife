@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/rpc"
 	"runtime"
+	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 )
 
@@ -25,6 +26,28 @@ type DistributorChannels struct {
 	ioInput    <-chan byte
 }
 
+func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels, client *rpc.Client, request Shared.Request, response *Shared.Response, turn <-chan int) {
+	var currentTurn = 0
+	for {
+		select {
+		//When the ticker triggers, we send an RPC call to return the number of alive cells
+		case <-ticker.C:
+			tickerError := client.Call(Shared.TickersHandler, request, response)
+			Shared.HandleError(tickerError)
+			if currentTurn == 0 {
+				response.AliveCells = 0
+			}
+			c.events <- Shared.AliveCellsCount{currentTurn, response.AliveCells}
+		//When the worker does one round, it updates the turns tally
+		case t := <-turn:
+			currentTurn = t
+		//When the worker does one round, it updates the current world
+		case world := <-request.CurrentWorld:
+			request.World = world
+		}
+	}
+}
+
 func controller(params Shared.Params, channels DistributorChannels, keyPresses <-chan rune) {
 	fmt.Println("Serverport: ", params.ServerPort)
 	client, dialError := rpc.Dial("tcp", params.ServerPort)
@@ -32,6 +55,12 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 
 	//Create request response pair
 	request, response := createRequestResponsePair(params, channels)
+
+	//Make a ticker for the updates
+	ticker := time.NewTicker(2 * time.Second)
+	turnChannel := make(chan int)
+	go aliveCellsReporter(ticker, channels, client, request, response, turnChannel)
+
 	callError := client.Call(Shared.GoLHandler, request, response)
 	Shared.HandleError(callError)
 

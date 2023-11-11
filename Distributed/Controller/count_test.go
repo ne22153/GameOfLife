@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
-	"uk.ac.bris.cs/gameoflife/gol"
 	//"uk.ac.bris.cs/gameoflife/gol"
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -41,7 +40,7 @@ func TestAlive(t *testing.T) {
 	i := 0
 	for event := range events {
 		switch e := event.(type) {
-		case gol.AliveCellsCount:
+		case Shared.AliveCellsCount:
 			var expected int
 			if e.CompletedTurns <= 10000 {
 				expected = alive[e.CompletedTurns]
@@ -70,7 +69,7 @@ func TestAlive(t *testing.T) {
 }
 
 func readAliveCounts(width, height int) map[int]int {
-	f, err := os.Open("check/alive/" + fmt.Sprintf("%vx%v.csv", width, height))
+	f, err := os.Open("../../check/alive/" + fmt.Sprintf("%vx%v.csv", width, height))
 	util.Check(err)
 	reader := csv.NewReader(f)
 	table, err := reader.ReadAll()
