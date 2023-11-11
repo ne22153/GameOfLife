@@ -2,6 +2,7 @@ package Controller
 
 import (
 	"net/rpc"
+	"strconv"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -40,4 +41,18 @@ func createRequestResponsePair(p Shared.Params, c DistributorChannels) (Shared.R
 	response := new(Shared.Response)
 
 	return request, response
+}
+
+//Helper function of controller
+//Performs necessary logic to end the game neatly
+func handleGameShutDown(client *rpc.Client, response *Shared.Response, p Shared.Params, c DistributorChannels) {
+	var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(
+		p.Turns)
+	writeToFileIO(response.World, p, filename, c)
+
+	c.ioCommand <- ioCheckIdle
+	<-c.ioIdle
+
+	defer handleCloseClient(client)
+	close(c.events)
 }
