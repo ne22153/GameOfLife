@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/rpc"
 	"runtime"
+	"strconv"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 )
 
@@ -38,6 +39,13 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	channels.events <- Shared.FinalTurnComplete{
 		CompletedTurns: params.Turns,
 		Alive:          calculateAliveCells(response.World)}
+
+	var filename = strconv.Itoa(params.ImageWidth) + "x" + strconv.Itoa(params.ImageHeight) + "x" + strconv.Itoa(
+		params.Turns)
+	writeToFileIO(response.World, params, filename, channels)
+
+	channels.ioCommand <- ioCheckIdle
+	<-channels.ioIdle
 
 	defer handleCloseClient(client)
 	close(channels.events)

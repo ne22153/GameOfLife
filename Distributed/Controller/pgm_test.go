@@ -17,7 +17,7 @@ func TestPgm(t *testing.T) {
 		for _, turns := range []int{0, 1, 100} {
 			p.Turns = turns
 			expectedAlive := readAliveCells(
-				"check/images/"+fmt.Sprintf("%vx%vx%v.pgm", p.ImageWidth, p.ImageHeight, turns),
+				"../../check/images/"+fmt.Sprintf("%vx%vx%v.pgm", p.ImageWidth, p.ImageHeight, turns),
 				p.ImageWidth,
 				p.ImageHeight,
 			)
@@ -30,7 +30,7 @@ func TestPgm(t *testing.T) {
 					for range events {
 					}
 					cellsFromImage := readAliveCells(
-						"out/"+fmt.Sprintf("%vx%vx%v.pgm", p.ImageWidth, p.ImageHeight, turns),
+						"../../out/"+fmt.Sprintf("%vx%vx%v.pgm", p.ImageWidth, p.ImageHeight, turns),
 						p.ImageWidth,
 						p.ImageHeight,
 					)
