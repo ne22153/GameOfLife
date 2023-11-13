@@ -6,30 +6,49 @@ import (
 	"math/rand"
 	"net"
 	"net/rpc"
+	"sync"
 	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 )
 
+type currentWorldStruct struct {
+	lock  sync.Mutex
+	world [][]byte
+}
+
+var currentWorld currentWorldStruct
+
+type currentTurnStruct struct {
+	lock sync.Mutex
+	turn int
+}
+
+var currentTurn currentTurnStruct
+
 //Does the actual working stuff
-func GoLWorker(inputWorld [][]byte, p Shared.Params, turn chan<- int, currentWorld chan [][]byte) [][]byte {
+func GoLWorker(inputWorld [][]byte, p Shared.Params, turn chan<- int, currentWorldChannel chan [][]byte) [][]byte {
 	var newWorld [][]byte
 	fmt.Println(p.Turns)
 	if p.Turns == 0 {
 		if p.ImageHeight == 16 {
 			fmt.Println("Auto done: ", inputWorld)
 		}
-		currentWorld <- inputWorld
+		//currentWorld <- inputWorld
+
 		return inputWorld
 	}
 	for i := 0; i < p.Turns; i++ {
 		newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
 		//currentWorld <- newWorld
 		inputWorld = newWorld
-		fmt.Println("Passing new world")
-		//This line is causing the whole thing to halt, as nothing is reading from the channel
-		//WorkerTracker is supposed to, but it seems the channels aren't the same for some reason
-		turn <- i + 1
-		fmt.Println("hahah")
+		//turn <- i + 1
+		currentWorld.lock.Lock()
+		currentWorld.world = inputWorld
+		currentWorld.lock.Unlock()
+
+		currentTurn.lock.Lock()
+		currentTurn.turn = i + 1
+		currentTurn.lock.Unlock()
 	}
 
 	return inputWorld
@@ -75,16 +94,20 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 type GoLOperations struct{}
 
 func (s *GoLOperations) TickerManager(req Shared.Request, res *Shared.Response) (err error) {
-	fmt.Println("Sending a signal")
-	req.CallAlive <- 1
-	fmt.Println("Awaiting response")
-	res.Turns = <-req.GetTurn
-	res.AliveCells = <-req.GetAlive
+	currentWorld.lock.Lock()
+	res.World = currentWorld.world
+	res.AliveCells = getAliveCellsCount(currentWorld.world)
+	currentWorld.lock.Unlock()
+
+	currentTurn.lock.Lock()
+	res.Turns = currentTurn.turn
+	currentTurn.lock.Unlock()
 	return
 }
 
-func (s *GoLOperations) GoLManager(req Shared.Request, res *Shared.Response) (err error) {
-	go WorkerTracker(req.World, req.Parameters, req.CurrentTurn, req.CurrentWorld, req.CallAlive, req.GetAlive, req.GetTurn)
+func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (err error) {
+	//go WorkerTracker(req.World, req.Parameters, req.CurrentTurn, req.CurrentWorld, req.CallAlive, req.GetAlive, req.GetTurn)
+	//fmt.Println("GoL gets: ", &req.CallAlive)
 	res.World = GoLWorker(req.World, req.Parameters, req.CurrentTurn, req.CurrentWorld)
 	return
 }

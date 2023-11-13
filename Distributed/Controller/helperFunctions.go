@@ -38,11 +38,11 @@ func createRequestResponsePair(p Shared.Params, c DistributorChannels) (Shared.R
 		World:       WriteFromFileIO(p.ImageHeight, p.ImageWidth, c),
 		Parameters:  p,
 		Events:      c.events,
-		CurrentTurn: make(chan int),
-		CallAlive:   make(chan int),
-		GetAlive:    make(chan int),
-		GetTurn:     make(chan int)}
-	
+		CurrentTurn: make(chan int, 1),
+		CallAlive:   make(chan int, 1),
+		GetAlive:    make(chan int, 1),
+		GetTurn:     make(chan int, 1)}
+
 	//There doesn't exist a response but we will create a new one
 	response := new(Shared.Response)
 

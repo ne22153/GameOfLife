@@ -26,7 +26,7 @@ type DistributorChannels struct {
 	ioInput    <-chan byte
 }
 
-func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels, client *rpc.Client, request Shared.Request, response *Shared.Response) {
+func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels, client *rpc.Client, request *Shared.Request, response *Shared.Response) {
 	c.events <- Shared.AliveCellsCount{CompletedTurns: 0, CellsCount: 0}
 	for {
 		select {
@@ -41,18 +41,19 @@ func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels, client *rpc.
 }
 
 func controller(params Shared.Params, channels DistributorChannels, keyPresses <-chan rune) {
-	fmt.Println("Serverport: ", params.ServerPort)
+	fmt.Println("Server port: ", params.ServerPort)
 	client, dialError := rpc.Dial("tcp", params.ServerPort)
 	Shared.HandleError(dialError)
 
 	//Create request response pair
 	request, response := createRequestResponsePair(params, channels)
+	fmt.Println("Actual address: ", &request.CallAlive)
 
 	//Make a ticker for the updates
 	ticker := time.NewTicker(2 * time.Second)
-	go aliveCellsReporter(ticker, channels, client, request, response)
+	go aliveCellsReporter(ticker, channels, client, &request, response)
 
-	callError := client.Call(Shared.GoLHandler, request, response)
+	callError := client.Call(Shared.GoLHandler, &request, response)
 	Shared.HandleError(callError)
 
 	channels.events <- Shared.FinalTurnComplete{
