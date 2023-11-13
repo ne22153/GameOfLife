@@ -1,7 +1,6 @@
 package Shared
 
 import (
-	"fmt"
 	"log"
 )
 
@@ -39,7 +38,6 @@ type Request struct {
 
 func HandleError(err error) {
 	if err != nil {
-		fmt.Println("broken here")
 		log.Fatal(err)
 	}
 }

@@ -37,6 +37,7 @@ const (
 	ioOutput IoCommand = iota
 	ioInput
 	ioCheckIdle
+	ioTicker
 )
 
 // writePgmImage receives an array of bytes and writes it to a pgm file.
@@ -149,6 +150,8 @@ func startIo(p Shared.Params, c IoChannels) {
 				io.writePgmImage()
 			case ioCheckIdle:
 				io.channels.idle <- true
+			case ioTicker:
+				io.channels.idle <- false
 			}
 
 		}

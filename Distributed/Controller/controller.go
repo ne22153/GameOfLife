@@ -73,7 +73,7 @@ func determineKeyPress(client *rpc.Client, keyPresses <-chan rune, req *Shared.R
 				ticker.Stop()
 				c.ioCommand <- ioCheckIdle
 				<-c.ioIdle
-				handleCloseClient(client)
+				defer handleCloseClient(client)
 				os.Exit(0)
 			}
 		}
@@ -104,7 +104,8 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 
 	//Shut down the game safely
 	fmt.Println("We here")
-	handleGameShutDown(client, response, params, channels, ticker)
+	defer handleGameShutDown(client, response, params, channels, ticker)
+	os.Exit(0)
 }
 
 func main() {
@@ -138,8 +139,8 @@ func main() {
 	flag.IntVar(
 		&params.Turns,
 		"turns",
-		10000000000,
-		"Specify the number of turns to process. Defaults to 10000000000.")
+		10000,
+		"Specify the number of turns to process. Defaults to 10000.")
 
 	flag.Parse()
 
