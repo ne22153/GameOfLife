@@ -50,10 +50,6 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 
 	//Make a ticker for the updates
 	ticker := time.NewTicker(2 * time.Second)
-	request.CurrentTurn = make(chan int)
-	request.CallAlive = make(chan int)
-	request.GetAlive = make(chan int)
-	request.GetTurn = make(chan int)
 	go aliveCellsReporter(ticker, channels, client, request, response)
 
 	callError := client.Call(Shared.GoLHandler, request, response)
@@ -64,7 +60,7 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 		Alive:          calculateAliveCells(response.World)}
 
 	//Shut down the game safely
-	handleGameShutDown(client, response, params, channels)
+	handleGameShutDown(client, response, params, channels, ticker)
 }
 
 func main() {

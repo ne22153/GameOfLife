@@ -3,6 +3,7 @@ package Controller
 import (
 	"net/rpc"
 	"strconv"
+	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -34,9 +35,14 @@ func createRequestResponsePair(p Shared.Params, c DistributorChannels) (Shared.R
 
 	//Forms the request which contains the [][]byte version of the PGM file
 	request := Shared.Request{
-		World:      WriteFromFileIO(p.ImageHeight, p.ImageWidth, c),
-		Parameters: p,
-		Events:     c.events}
+		World:       WriteFromFileIO(p.ImageHeight, p.ImageWidth, c),
+		Parameters:  p,
+		Events:      c.events,
+		CurrentTurn: make(chan int),
+		CallAlive:   make(chan int),
+		GetAlive:    make(chan int),
+		GetTurn:     make(chan int)}
+	
 	//There doesn't exist a response but we will create a new one
 	response := new(Shared.Response)
 
@@ -45,11 +51,12 @@ func createRequestResponsePair(p Shared.Params, c DistributorChannels) (Shared.R
 
 //Helper function of controller
 //Performs necessary logic to end the game neatly
-func handleGameShutDown(client *rpc.Client, response *Shared.Response, p Shared.Params, c DistributorChannels) {
+func handleGameShutDown(client *rpc.Client, response *Shared.Response, p Shared.Params, c DistributorChannels, ticker *time.Ticker) {
 	var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(
 		p.Turns)
 	writeToFileIO(response.World, p, filename, c)
 
+	ticker.Stop()
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
 
