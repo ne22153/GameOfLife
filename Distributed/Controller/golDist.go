@@ -1,4 +1,4 @@
-package Controller
+package main
 
 import (
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"

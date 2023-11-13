@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"net/rpc"
+	"os"
 	"sync"
 	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
@@ -24,6 +25,15 @@ type currentTurnStruct struct {
 }
 
 var currentTurn currentTurnStruct
+
+type pausedStruct struct {
+	lock  sync.Mutex
+	pause bool
+}
+
+var paused pausedStruct
+
+var condition sync.WaitGroup
 
 //Does the actual working stuff
 func GoLWorker(inputWorld [][]byte, p Shared.Params, turn chan<- int, currentWorldChannel chan [][]byte) [][]byte {
@@ -49,32 +59,13 @@ func GoLWorker(inputWorld [][]byte, p Shared.Params, turn chan<- int, currentWor
 		currentTurn.lock.Lock()
 		currentTurn.turn = i + 1
 		currentTurn.lock.Unlock()
-	}
 
+		paused.lock.Lock()
+		paused.lock.Unlock()
+		fmt.Println("Done", i+1)
+	}
+	condition.Done()
 	return inputWorld
-}
-
-func WorkerTracker(inputWorld [][]byte, p Shared.Params, turn chan int, world chan [][]byte, alive chan int, give chan int, getTurn chan int) {
-	var currentTurn = 0
-	var currentWorld [][]byte
-	fmt.Println("I've been activated")
-	for {
-		select {
-		case t := <-turn:
-			currentTurn = t
-			fmt.Println("Turn changed")
-		case newWorld := <-world:
-			fmt.Println("World changed")
-			currentWorld = newWorld
-		case <-alive:
-			fmt.Println("Call received")
-			getTurn <- currentTurn
-			give <- getAliveCellsCount(currentWorld)
-		default:
-			time.Sleep(2 * time.Second)
-			fmt.Println("Argh, nothing is happening")
-		}
-	}
 }
 
 func getAliveCellsCount(inputWorld [][]byte) int {
@@ -108,7 +99,46 @@ func (s *GoLOperations) TickerManager(req Shared.Request, res *Shared.Response) 
 func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (err error) {
 	//go WorkerTracker(req.World, req.Parameters, req.CurrentTurn, req.CurrentWorld, req.CallAlive, req.GetAlive, req.GetTurn)
 	//fmt.Println("GoL gets: ", &req.CallAlive)
-	res.World = GoLWorker(req.World, req.Parameters, req.CurrentTurn, req.CurrentWorld)
+	if paused.pause {
+		paused.lock.Unlock()
+		paused.pause = !paused.pause
+
+		condition.Wait()
+		currentWorld.lock.Lock()
+		res.World = currentWorld.world
+		currentWorld.lock.Unlock()
+
+	} else {
+		condition.Add(1)
+		res.World = GoLWorker(req.World, req.Parameters, req.CurrentTurn, req.CurrentWorld)
+	}
+	//paused.lock.Unlock()
+	//res.World = GoLWorker(req.World, req.Parameters, req.CurrentTurn, req.CurrentWorld)
+	return
+}
+
+func (s *GoLOperations) KYS(req *Shared.Request, res *Shared.Response) (err error) {
+	fmt.Println("Did the shit")
+	//paused.lock.Lock()
+	os.Exit(0)
+	return
+}
+
+func (s *GoLOperations) PauseManager(req *Shared.Request, res *Shared.Response) (err error) {
+	if paused.pause {
+		paused.lock.Unlock()
+	} else {
+		fmt.Println("Locking")
+		paused.lock.Lock()
+	}
+	paused.pause = !paused.pause
+	return
+}
+
+func (s *GoLOperations) BackgroundManager(req *Shared.Request, res *Shared.Response) (err error) {
+	fmt.Println("Stopped for now")
+	paused.pause = true
+	paused.lock.Lock()
 	return
 }
 

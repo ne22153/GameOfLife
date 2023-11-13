@@ -15,7 +15,10 @@ type Params struct {
 }
 
 var GoLHandler = "GoLOperations.GoLManager"
-var TickersHandler = "GoLOperations.TickerManager"
+var InfoHandler = "GoLOperations.TickerManager"
+var SuicideHandler = "GoLOperations.KYS"
+var PauseHandler = "GoLOperations.PauseManager"
+var BackgroundHandler = "GoLOperations.BackgroundManager"
 
 type Response struct {
 	World      [][]byte
