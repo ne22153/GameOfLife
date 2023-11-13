@@ -29,6 +29,9 @@ type Request struct {
 	Events       chan<- Event
 	CurrentTurn  chan int
 	CurrentWorld chan [][]byte
+	CallAlive    chan int
+	GetAlive     chan int
+	GetTurn      chan int
 }
 
 func HandleError(err error) {

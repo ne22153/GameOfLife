@@ -26,24 +26,16 @@ type DistributorChannels struct {
 	ioInput    <-chan byte
 }
 
-func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels, client *rpc.Client, request Shared.Request, response *Shared.Response, turn <-chan int) {
-	var currentTurn = 0
+func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels, client *rpc.Client, request Shared.Request, response *Shared.Response) {
+	c.events <- Shared.AliveCellsCount{CompletedTurns: 0, CellsCount: 0}
 	for {
 		select {
-		//When the ticker triggers, we send an RPC call to return the number of alive cells
+		//When the ticker triggers, we send an RPC call to return the number of alive cells, and number of turns processed
 		case <-ticker.C:
+			fmt.Println("Sending call")
 			tickerError := client.Call(Shared.TickersHandler, request, response)
 			Shared.HandleError(tickerError)
-			if currentTurn == 0 {
-				response.AliveCells = 0
-			}
-			c.events <- Shared.AliveCellsCount{currentTurn, response.AliveCells}
-		//When the worker does one round, it updates the turns tally
-		case t := <-turn:
-			currentTurn = t
-		//When the worker does one round, it updates the current world
-		case world := <-request.CurrentWorld:
-			request.World = world
+			c.events <- Shared.AliveCellsCount{response.Turns, response.AliveCells}
 		}
 	}
 }
@@ -58,8 +50,11 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 
 	//Make a ticker for the updates
 	ticker := time.NewTicker(2 * time.Second)
-	turnChannel := make(chan int)
-	go aliveCellsReporter(ticker, channels, client, request, response, turnChannel)
+	request.CurrentTurn = make(chan int)
+	request.CallAlive = make(chan int)
+	request.GetAlive = make(chan int)
+	request.GetTurn = make(chan int)
+	go aliveCellsReporter(ticker, channels, client, request, response)
 
 	callError := client.Call(Shared.GoLHandler, request, response)
 	Shared.HandleError(callError)

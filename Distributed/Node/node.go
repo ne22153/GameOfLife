@@ -23,12 +23,39 @@ func GoLWorker(inputWorld [][]byte, p Shared.Params, turn chan<- int, currentWor
 	}
 	for i := 0; i < p.Turns; i++ {
 		newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
+		//currentWorld <- newWorld
 		inputWorld = newWorld
-		currentWorld <- inputWorld
+		fmt.Println("Passing new world")
+		//This line is causing the whole thing to halt, as nothing is reading from the channel
+		//WorkerTracker is supposed to, but it seems the channels aren't the same for some reason
 		turn <- i + 1
+		fmt.Println("hahah")
 	}
 
 	return inputWorld
+}
+
+func WorkerTracker(inputWorld [][]byte, p Shared.Params, turn chan int, world chan [][]byte, alive chan int, give chan int, getTurn chan int) {
+	var currentTurn = 0
+	var currentWorld [][]byte
+	fmt.Println("I've been activated")
+	for {
+		select {
+		case t := <-turn:
+			currentTurn = t
+			fmt.Println("Turn changed")
+		case newWorld := <-world:
+			fmt.Println("World changed")
+			currentWorld = newWorld
+		case <-alive:
+			fmt.Println("Call received")
+			getTurn <- currentTurn
+			give <- getAliveCellsCount(currentWorld)
+		default:
+			time.Sleep(2 * time.Second)
+			fmt.Println("Argh, nothing is happening")
+		}
+	}
 }
 
 func getAliveCellsCount(inputWorld [][]byte) int {
@@ -45,25 +72,19 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 	return aliveCells
 }
 
-func aliveCellsReporter(turn, aliveCells *int, ticker *time.Ticker, c chan<- Shared.Event) {
-	for {
-		select {
-		case <-ticker.C:
-			c <- Shared.AliveCellsCount{CompletedTurns: *turn, CellsCount: *aliveCells}
-			fmt.Println("Sent")
-		}
-	}
-}
-
 type GoLOperations struct{}
 
 func (s *GoLOperations) TickerManager(req Shared.Request, res *Shared.Response) (err error) {
-	fmt.Println("entered")
-	res.AliveCells = getAliveCellsCount(req.World)
+	fmt.Println("Sending a signal")
+	req.CallAlive <- 1
+	fmt.Println("Awaiting response")
+	res.Turns = <-req.GetTurn
+	res.AliveCells = <-req.GetAlive
 	return
 }
 
 func (s *GoLOperations) GoLManager(req Shared.Request, res *Shared.Response) (err error) {
+	go WorkerTracker(req.World, req.Parameters, req.CurrentTurn, req.CurrentWorld, req.CallAlive, req.GetAlive, req.GetTurn)
 	res.World = GoLWorker(req.World, req.Parameters, req.CurrentTurn, req.CurrentWorld)
 	return
 }
