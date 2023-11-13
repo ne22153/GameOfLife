@@ -51,20 +51,7 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	//Make a ticker for the updates
 	ticker := time.NewTicker(2 * time.Second)
 
-	go func() {
-		channels.events <- Shared.AliveCellsCount{CompletedTurns: 0, CellsCount: 0}
-		for {
-			select {
-			//When the ticker triggers, we send an RPC call to return the number of alive cells, and number of turns processed
-			case <-ticker.C:
-				fmt.Println("Sending call")
-				tickerError := client.Call(Shared.TickersHandler, request, response)
-				Shared.HandleError(tickerError)
-				channels.events <- Shared.AliveCellsCount{response.Turns, response.AliveCells}
-			}
-		}
-	}()
-	//go aliveCellsReporter(ticker, channels, client, request, response)
+	go aliveCellsReporter(ticker, channels, client, request, response)
 
 	callError := client.Call(Shared.GoLHandler, request, response)
 	Shared.HandleError(callError)
