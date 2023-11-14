@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"net/rpc"
-	"os"
 	"runtime"
 	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
@@ -43,7 +42,7 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 
 	//Shut down the game safely
 	defer handleGameShutDown(client, response, params, channels, ticker)
-	os.Exit(0)
+	//os.Exit(0)
 }
 
 func main() {
