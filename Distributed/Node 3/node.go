@@ -43,14 +43,14 @@ func changeCurrentWorld(input [][]byte) {
 
 //General helper function for the global variables
 //Locks current turn's lock, changes the turn value to the input, then Unlocks it
-func changeCurrentTurn(input int) {
+/*func changeCurrentTurn(input int) {
 	currentTurn.lock.Lock()
 	currentTurn.turn = input
 	currentTurn.lock.Unlock()
-}
+}*/
 
-//Does the actual working stuff
-func GoLWorker(inputWorld [][]byte, p Shared.Params, turn chan<- int, currentWorldChannel chan [][]byte) [][]byte {
+// GoLWorker does the actual working stuff
+func GoLWorker(inputWorld [][]byte, p Shared.Params) [][]byte {
 	var newWorld [][]byte
 	fmt.Println(p.Turns)
 	if p.Turns == 0 {
@@ -59,18 +59,14 @@ func GoLWorker(inputWorld [][]byte, p Shared.Params, turn chan<- int, currentWor
 		}
 		return inputWorld
 	}
-	for i := 0; i < p.Turns; i++ {
-		newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
-		//currentWorld <- newWorld
-		inputWorld = newWorld
-		//turn <- i + 1
-		changeCurrentWorld(inputWorld)
-		changeCurrentTurn(i + 1)
+	newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
+	//currentWorld <- newWorld
+	inputWorld = newWorld
+	//turn <- i + 1
+	changeCurrentWorld(inputWorld)
 
-		paused.lock.Lock()
-		paused.lock.Unlock()
-		fmt.Println("Done", i+1)
-	}
+	paused.lock.Lock()
+	paused.lock.Unlock()
 	//Once all turns have been processed, free the condition variable
 	condition.Done()
 	return inputWorld
@@ -95,7 +91,7 @@ type GoLOperations struct{}
 
 // TickerManager :Handler for the ticker. Extracts the alive cells count and the turns of the current running state
 //into the response.
-func (s *GoLOperations) TickerManager(req Shared.Request, res *Shared.Response) (err error) {
+/*func (s *GoLOperations) TickerManager(req Shared.Request, res *Shared.Response) (err error) {
 	currentWorld.lock.Lock()
 	res.World = currentWorld.world
 	res.AliveCells = getAliveCellsCount(currentWorld.world)
@@ -105,7 +101,7 @@ func (s *GoLOperations) TickerManager(req Shared.Request, res *Shared.Response) 
 	res.Turns = currentTurn.turn
 	currentTurn.lock.Unlock()
 	return
-}
+}*/
 
 // GoLManager :Handler for the actual GoL algorithm
 func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (err error) {
@@ -121,7 +117,7 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 		currentWorld.lock.Unlock()
 	} else { //If the node is fresh and no previous GoL instance was running in the past
 		condition.Add(1)
-		res.World = GoLWorker(req.World, req.Parameters, req.CurrentTurn, req.CurrentWorld)
+		res.World = GoLWorker(req.World, req.Parameters)
 	}
 
 	return
@@ -129,7 +125,7 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 
 // KYS :Handler whenever the user presses "K".
 //Called from the local controller to tell the AWS node to kill itself
-func (s *GoLOperations) KYS(req *Shared.Request, res *Shared.Response) (err error) {
+func (s *GoLOperations) KYS(*Shared.Request, *Shared.Response) (err error) {
 	fmt.Println("Terminated sucessfully")
 
 	defer os.Exit(0)
@@ -138,8 +134,8 @@ func (s *GoLOperations) KYS(req *Shared.Request, res *Shared.Response) (err erro
 }
 
 // PauseManager :Handler whenever the user presses "p"
-//If aready pasued then unpause, otherwise pause.
-func (s *GoLOperations) PauseManager(req *Shared.Request, res *Shared.Response) (err error) {
+//If already paused then unpause, otherwise pause.
+func (s *GoLOperations) PauseManager(*Shared.Request, *Shared.Response) (err error) {
 	if paused.pause {
 		paused.lock.Unlock()
 	} else {
@@ -153,7 +149,7 @@ func (s *GoLOperations) PauseManager(req *Shared.Request, res *Shared.Response) 
 // BackgroundManager :Handler whenever the user presses "q"
 //	WHen the local controller is killed, then pause the node and then wait until a new local controller is created
 // This is a form of fault tolerance.
-func (s *GoLOperations) BackgroundManager(req *Shared.Request, res *Shared.Response) (err error) {
+func (s *GoLOperations) BackgroundManager(*Shared.Request, *Shared.Response) (err error) {
 	fmt.Println("Stopped - waiting for a controller to reconnect to it.")
 	paused.pause = true
 	paused.lock.Lock()
@@ -161,12 +157,17 @@ func (s *GoLOperations) BackgroundManager(req *Shared.Request, res *Shared.Respo
 }
 
 func main() {
-	pAddr := flag.String("port", "8030", "Port to listen on")
+	pAddr := flag.String("port", "8033", "Port to listen on")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 	var registerError error = rpc.Register(&GoLOperations{})
 	Shared.HandleError(registerError)
 	listener, _ := net.Listen("tcp", ":"+*pAddr)
-	defer listener.Close()
+	defer func(listener net.Listener) {
+		err := listener.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(listener)
 	rpc.Accept(listener)
 }

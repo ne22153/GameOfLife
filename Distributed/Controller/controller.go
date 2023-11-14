@@ -35,7 +35,7 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	go aliveCellsReporter(ticker, channels, client, &request, response)
 	go determineKeyPress(client, keyPresses, &request, response, ticker, channels)
 
-	handleCallAndError(client, Shared.GoLHandler, &request, response)
+	handleCallAndError(client, Shared.BrokerHandler, &request, response)
 	channels.events <- Shared.FinalTurnComplete{
 		CompletedTurns: params.Turns,
 		Alive:          calculateAliveCells(response.World)}

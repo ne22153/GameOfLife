@@ -5,14 +5,14 @@ import (
 	//main2 "uk.ac.bris.cs/gameoflife/Distributed/Controller"
 )
 
-const HARD_CODED_SERVER_PORT = "127.0.0.1:8030"
+const HardCodedServerPort = "127.0.0.1:8030"
 
 // Run starts the processing of Game of Life. It should initialise channels and goroutines.
 func Run(p Shared.Params, events chan<- Shared.Event, keyPresses <-chan rune) {
 
 	//	TODO: Put the missing channels in here.
 
-	p.ServerPort = HARD_CODED_SERVER_PORT
+	p.ServerPort = HardCodedServerPort
 
 	ioCommand := make(chan IoCommand)
 	ioIdle := make(chan bool)

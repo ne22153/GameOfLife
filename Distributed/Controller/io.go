@@ -19,13 +19,13 @@ type IoChannels struct {
 	input    chan<- uint8
 }
 
-// ioState is the internal ioState of the io goroutine.
+// IoState is the internal ioState of the io goroutine.
 type IoState struct {
 	params   Shared.Params
 	channels IoChannels
 }
 
-// ioCommand allows requesting behaviour from the io (pgm) goroutine.
+// IoCommand allows requesting behaviour from the io (pgm) goroutine.
 type IoCommand uint8
 
 // This is a way of creating enums in Go.
@@ -49,10 +49,15 @@ func (io *IoState) writePgmImage() {
 
 	file, ioError := os.Create("../../out/" + filename + ".pgm")
 	util.Check(ioError)
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(file)
 
 	_, _ = file.WriteString("P5\n")
-	//_, _ = file.WriteString("# PGM file writer by pnmmodules (https://github.com/owainkenwayucl/pnmmodules).\n")
+	//_, _ = file.WriteString("# PGM file writer by modules (https://github.com/owainkenwayucl/pnmmodules).\n")
 	_, _ = file.WriteString(strconv.Itoa(io.params.ImageWidth))
 	_, _ = file.WriteString(" ")
 	_, _ = file.WriteString(strconv.Itoa(io.params.ImageHeight))

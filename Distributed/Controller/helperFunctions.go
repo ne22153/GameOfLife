@@ -20,7 +20,7 @@ func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels,
 		//When the ticker triggers,
 		//we send an RPC call to return the number of alive cells, and number of turns processed
 		case <-ticker.C:
-			handleCallAndError(client, Shared.InfoHandler, request, response)
+			handleCallAndError(client, Shared.BrokerInfo, request, response)
 			c.events <- Shared.AliveCellsCount{
 				CompletedTurns: response.Turns,
 				CellsCount:     response.AliveCells}
@@ -56,7 +56,7 @@ func createRequestResponsePair(p Shared.Params, c DistributorChannels) (Shared.R
 		CallAlive:   make(chan int, 1),
 		GetAlive:    make(chan int, 1),
 		GetTurn:     make(chan int, 1)}
-	//There doesn't exist a response but we will create a new one
+	//There doesn't exist a response, but we will create a new one
 	response := new(Shared.Response)
 
 	return request, response
@@ -73,7 +73,7 @@ func handleCloseClient(client *rpc.Client) {
 //Wraps a common call-error pattern into a function. performs a call then handles any errors if necessary
 func handleCallAndError(client *rpc.Client, namedFunctionHandler string,
 	request *Shared.Request, response *Shared.Response) {
-	var namedFunctionHandlerError error = client.Call(namedFunctionHandler, request, response)
+	var namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
 	Shared.HandleError(namedFunctionHandlerError)
 }
 
@@ -108,25 +108,22 @@ func determineKeyPress(client *rpc.Client, keyPresses <-chan rune,
 		select {
 		case key := <-keyPresses:
 			if key == 'k' {
-				fmt.Println("Bruh1")
-				handleCallAndError(client, Shared.InfoHandler, req, res)
-				fmt.Println("Bruh2")
-				handleCallAndError(client, Shared.SuicideHandler, req, res)
-				fmt.Println("Bruh3")
+				handleCallAndError(client, Shared.BrokerInfo, req, res)
+				handleCallAndError(client, Shared.BrokerKill, req, res)
 				handleGameShutDown(client, res, req.Parameters, c, ticker)
 				os.Exit(0)
 			} else if key == 's' {
-				handleCallAndError(client, Shared.InfoHandler, req, res)
-				var filename string = strconv.Itoa(req.Parameters.ImageWidth) + "x" +
+				handleCallAndError(client, Shared.BrokerInfo, req, res)
+				var filename = strconv.Itoa(req.Parameters.ImageWidth) + "x" +
 					strconv.Itoa(req.Parameters.ImageHeight) + "x" +
 					strconv.Itoa(res.Turns)
 				writeToFileIO(res.World, req.Parameters, filename, c)
 			} else if key == 'p' {
 				fmt.Println("Continuing")
-				handleCallAndError(client, Shared.PauseHandler, req, res)
+				handleCallAndError(client, Shared.BrokerPause, req, res)
 			} else if key == 'q' {
-				handleCallAndError(client, Shared.BackgroundHandler, req, res)
-				handleCallAndError(client, Shared.InfoHandler, req, res)
+				handleCallAndError(client, Shared.BrokerBackground, req, res)
+				handleCallAndError(client, Shared.BrokerInfo, req, res)
 				ticker.Stop()
 				c.ioCommand <- ioCheckIdle
 				<-c.ioIdle

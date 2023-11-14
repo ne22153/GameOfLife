@@ -5,11 +5,11 @@ import (
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 )
 
-//Helper function of distributor. We use this to create an initial world map from a file name
+// WriteFromFileIO is a helper function of distributor. We use this to create an initial world map from a file name
 func WriteFromFileIO(imageHeight, imageWidth int, c DistributorChannels) [][]byte {
 
 	//We create the worlds
-	var world [][]byte = make([][]byte, imageHeight)
+	var world = make([][]byte, imageHeight)
 	for i := 0; i < imageHeight; i++ {
 		world[i] = make([]byte, imageWidth)
 	}

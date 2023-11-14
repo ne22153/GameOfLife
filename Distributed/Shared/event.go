@@ -129,35 +129,3 @@ func (event FinalTurnComplete) String() string {
 func (event FinalTurnComplete) GetCompletedTurns() int {
 	return event.CompletedTurns
 }
-
-// This might all seem like weird syntax to you...
-// You have however seen something similar to it before in first year.
-
-// In the Go code an Interface called Event is created, this provides a set of methods that
-// need to be defined for something to have the type Event.
-
-// This is a similar concept to typeclasses in Haskell. A typeclass called Event could be defined.
-// It would require two methods to be implemented: string and getCompletedTurns. Note the
-// similarities between the type signatures of the Go and Haskell functions.
-
-/*
-> class Event event where
->   string :: event -> String
->   getCompletedTurns :: event -> Int
-*/
-
-// A new data type called ImageOutputComplete can then be created, just like in Go.
-
-/*
-> data ImageOutputComplete = ImageOutputComplete Int String
-*/
-
-// Now in the Go code extension methods are created for the ImageOutputComplete so that it
-// provides the methods required for the Event Inteface. Similarly in Haskell, an instance
-// of the typeclass Event can be created.
-
-/*
-> instance Event ImageOutputComplete where
->   string (ImageOutputComplete t f) = concat ["Turn ", show t, " - File ", f, " output complete"]
->   getCompletedTurns (ImageOutputComplete t f) = t
-*/
