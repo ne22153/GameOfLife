@@ -10,13 +10,6 @@ import (
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 )
 
-/*type Params struct {
-	Turns       int
-	Threads     int
-	ImageWidth  int
-	ImageHeight int
-}*/
-
 type DistributorChannels struct {
 	events    chan<- Shared.Event
 	ioCommand chan<- IoCommand
@@ -39,18 +32,15 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	//Make a ticker for the updates
 	ticker := time.NewTicker(2 * time.Second)
 	go aliveCellsReporter(ticker, channels, client, &request, response)
-
 	go determineKeyPress(client, keyPresses, &request, response, ticker, channels)
 
-	callError := client.Call(Shared.GoLHandler, &request, response)
-	Shared.HandleError(callError)
+	handleCallAndError(client, Shared.GoLHandler, &request, response)
 
 	channels.events <- Shared.FinalTurnComplete{
 		CompletedTurns: params.Turns,
 		Alive:          calculateAliveCells(response.World)}
 
 	//Shut down the game safely
-	fmt.Println("We here")
 	defer handleGameShutDown(client, response, params, channels, ticker)
 	os.Exit(0)
 }
@@ -100,5 +90,4 @@ func main() {
 
 	go Run(params, events, keyPresses)
 	Shared.Run(params, events, keyPresses)
-
 }

@@ -12,15 +12,18 @@ import (
 
 //Helper function of controller
 //Performs necessary logic in order to handle the ticker
-func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels, client *rpc.Client, request *Shared.Request, response *Shared.Response) {
+func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels,
+	client *rpc.Client, request *Shared.Request, response *Shared.Response) {
 	c.events <- Shared.AliveCellsCount{CompletedTurns: 0, CellsCount: 0}
 	for {
 		select {
-		//When the ticker triggers, we send an RPC call to return the number of alive cells, and number of turns processed
+		//When the ticker triggers,
+		//we send an RPC call to return the number of alive cells, and number of turns processed
 		case <-ticker.C:
-			tickerError := client.Call(Shared.InfoHandler, request, response)
-			Shared.HandleError(tickerError)
-			c.events <- Shared.AliveCellsCount{response.Turns, response.AliveCells}
+			handleCallAndError(client, Shared.InfoHandler, request, response)
+			c.events <- Shared.AliveCellsCount{
+				CompletedTurns: response.Turns,
+				CellsCount:     response.AliveCells}
 			fmt.Println("On turn: ", response.Turns, ", Alive cells: ", response.AliveCells)
 		}
 	}
@@ -53,7 +56,6 @@ func createRequestResponsePair(p Shared.Params, c DistributorChannels) (Shared.R
 		CallAlive:   make(chan int, 1),
 		GetAlive:    make(chan int, 1),
 		GetTurn:     make(chan int, 1)}
-
 	//There doesn't exist a response but we will create a new one
 	response := new(Shared.Response)
 
@@ -75,18 +77,24 @@ func handleCallAndError(client *rpc.Client, namedFunctionHandler string,
 	Shared.HandleError(namedFunctionHandlerError)
 }
 
-//Helper function of controller
-//Performs necessary logic to end the game neatly
-func handleGameShutDown(client *rpc.Client, response *Shared.Response, p Shared.Params, c DistributorChannels, ticker *time.Ticker) {
-	var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(
-		p.Turns)
-	writeToFileIO(response.World, p, filename, c)
-
+//General helper function
+//Set the io to idle and ticker to stop and close the client
+func shutdDownIOTickerClient(c DistributorChannels, ticker *time.Ticker, client *rpc.Client) {
 	ticker.Stop()
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
 
 	defer handleCloseClient(client)
+}
+
+//Helper function of controller
+//Performs necessary logic to end the game neatly
+func handleGameShutDown(client *rpc.Client, response *Shared.Response,
+	p Shared.Params, c DistributorChannels, ticker *time.Ticker) {
+	var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(
+		p.Turns)
+	writeToFileIO(response.World, p, filename, c)
+	shutdDownIOTickerClient(c, ticker, client)
 	close(c.events)
 }
 
@@ -96,6 +104,7 @@ func determineKeyPress(client *rpc.Client,
 	keyPresses <-chan rune,
 	req *Shared.Request, res *Shared.Response,
 	ticker *time.Ticker, c DistributorChannels) {
+	//We makes sure this runs forever while the controller is alive
 	for {
 		select {
 		case key := <-keyPresses:
@@ -105,27 +114,18 @@ func determineKeyPress(client *rpc.Client,
 				handleGameShutDown(client, res, req.Parameters, c, ticker)
 				os.Exit(0)
 			} else if key == 's' {
-				qError := client.Call(Shared.InfoHandler, req, res)
-				Shared.HandleError(qError)
+				handleCallAndError(client, Shared.InfoHandler, req, res)
 				var filename string = strconv.Itoa(req.Parameters.ImageWidth) + "x" +
 					strconv.Itoa(req.Parameters.ImageHeight) + "x" +
 					strconv.Itoa(res.Turns)
 				writeToFileIO(res.World, req.Parameters, filename, c)
 			} else if key == 'p' {
 				fmt.Println("Continuing")
-				pError := client.Call(Shared.PauseHandler, req, res)
-				Shared.HandleError(pError)
+				handleCallAndError(client, Shared.PauseHandler, req, res)
 			} else if key == 'q' {
-				qError := client.Call(Shared.BackgroundHandler, req, res)
-				Shared.HandleError(qError)
-
-				kError := client.Call(Shared.InfoHandler, req, res)
-				Shared.HandleError(kError)
-
-				ticker.Stop()
-				c.ioCommand <- ioCheckIdle
-				<-c.ioIdle
-				defer handleCloseClient(client)
+				handleCallAndError(client, Shared.BackgroundHandler, req, res)
+				handleCallAndError(client, Shared.InfoHandler, req, res)
+				shutdDownIOTickerClient(c, ticker, client)
 				os.Exit(0)
 			}
 		}
