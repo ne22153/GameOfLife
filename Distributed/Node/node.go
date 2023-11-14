@@ -12,6 +12,21 @@ import (
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 )
 
+type currentWorldStruct struct {
+	world [][]byte
+	lock  sync.Mutex
+}
+
+type currentTurnStruct struct {
+	turn int
+	lock sync.Mutex
+}
+
+type pausedStruct struct {
+	pause bool
+	lock  sync.Mutex
+}
+
 //Globals we made for general management of mutexes and variables
 var currentWorld currentWorldStruct
 var currentTurn currentTurnStruct
@@ -59,6 +74,20 @@ func GoLWorker(inputWorld [][]byte, p Shared.Params, turn chan<- int, currentWor
 	//Once all turns have been processed, free the condition variable
 	condition.Done()
 	return inputWorld
+}
+
+func getAliveCellsCount(inputWorld [][]byte) int {
+	aliveCells := 0
+
+	for _, row := range inputWorld {
+		for _, tile := range row {
+			if tile == LIVE {
+				aliveCells++
+			}
+		}
+	}
+
+	return aliveCells
 }
 
 // GoLOperations :Handles GoL operations and all of its methods
