@@ -108,8 +108,11 @@ func determineKeyPress(client *rpc.Client, keyPresses <-chan rune,
 		select {
 		case key := <-keyPresses:
 			if key == 'k' {
+				fmt.Println("Bruh1")
 				handleCallAndError(client, Shared.InfoHandler, req, res)
+				fmt.Println("Bruh2")
 				handleCallAndError(client, Shared.SuicideHandler, req, res)
+				fmt.Println("Bruh3")
 				handleGameShutDown(client, res, req.Parameters, c, ticker)
 				os.Exit(0)
 			} else if key == 's' {
@@ -128,7 +131,7 @@ func determineKeyPress(client *rpc.Client, keyPresses <-chan rune,
 				c.ioCommand <- ioCheckIdle
 				<-c.ioIdle
 
-				defer handleCloseClient(client)
+				handleCloseClient(client)
 				os.Exit(0)
 			}
 		}

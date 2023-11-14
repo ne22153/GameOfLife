@@ -131,8 +131,10 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 //Called from the local controller to tell the AWS node to kill itself
 func (s *GoLOperations) KYS(req *Shared.Request, res *Shared.Response) (err error) {
 	fmt.Println("Terminated sucessfully")
-	os.Exit(0)
+
+	defer os.Exit(0)
 	return
+
 }
 
 // PauseManager :Handler whenever the user presses "p"
