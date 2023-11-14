@@ -63,7 +63,7 @@ func createRequestResponsePair(p Shared.Params, c DistributorChannels) (Shared.R
 }
 
 //Helper function to controller
-//Handles necessary logic for closing the client neatly and sucessfully
+//Handles necessary logic for closing the client neatly and successfully
 func handleCloseClient(client *rpc.Client) {
 	closeError := client.Close()
 	Shared.HandleError(closeError)
@@ -79,7 +79,7 @@ func handleCallAndError(client *rpc.Client, namedFunctionHandler string,
 
 //General helper function
 //Set the io to idle and ticker to stop and close the client
-func shutdDownIOTickerClient(c DistributorChannels, ticker *time.Ticker, client *rpc.Client) {
+func shutDownIOTickerClient(c DistributorChannels, ticker *time.Ticker, client *rpc.Client) {
 	ticker.Stop()
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
@@ -91,17 +91,16 @@ func shutdDownIOTickerClient(c DistributorChannels, ticker *time.Ticker, client 
 //Performs necessary logic to end the game neatly
 func handleGameShutDown(client *rpc.Client, response *Shared.Response,
 	p Shared.Params, c DistributorChannels, ticker *time.Ticker) {
-	var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(
-		p.Turns)
+	var filename = strconv.Itoa(p.ImageWidth) + "x" +
+		strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(p.Turns)
 	writeToFileIO(response.World, p, filename, c)
-	shutdDownIOTickerClient(c, ticker, client)
+	shutDownIOTickerClient(c, ticker, client)
 	close(c.events)
 }
 
 //Helper function of controller
-//Performs neccessary logic for key presses by the user
-func determineKeyPress(client *rpc.Client,
-	keyPresses <-chan rune,
+//Performs necessary logic for key presses by the user
+func determineKeyPress(client *rpc.Client, keyPresses <-chan rune,
 	req *Shared.Request, res *Shared.Response,
 	ticker *time.Ticker, c DistributorChannels) {
 	//We makes sure this runs forever while the controller is alive
@@ -125,7 +124,11 @@ func determineKeyPress(client *rpc.Client,
 			} else if key == 'q' {
 				handleCallAndError(client, Shared.BackgroundHandler, req, res)
 				handleCallAndError(client, Shared.InfoHandler, req, res)
-				shutdDownIOTickerClient(c, ticker, client)
+				ticker.Stop()
+				c.ioCommand <- ioCheckIdle
+				<-c.ioIdle
+
+				defer handleCloseClient(client)
 				os.Exit(0)
 			}
 		}

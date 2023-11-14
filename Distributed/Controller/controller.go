@@ -20,6 +20,7 @@ type DistributorChannels struct {
 	ioInput    <-chan byte
 }
 
+//Main logic where we control all of our AWS nodes. Also controls the ticker and keypress logic as well.
 func controller(params Shared.Params, channels DistributorChannels, keyPresses <-chan rune) {
 	fmt.Println("Server port: ", params.ServerPort)
 	client, dialError := rpc.Dial("tcp", params.ServerPort)
@@ -31,11 +32,11 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 
 	//Make a ticker for the updates
 	ticker := time.NewTicker(2 * time.Second)
+	//Set up the ticker and keypress processes
 	go aliveCellsReporter(ticker, channels, client, &request, response)
 	go determineKeyPress(client, keyPresses, &request, response, ticker, channels)
 
 	handleCallAndError(client, Shared.GoLHandler, &request, response)
-
 	channels.events <- Shared.FinalTurnComplete{
 		CompletedTurns: params.Turns,
 		Alive:          calculateAliveCells(response.World)}
