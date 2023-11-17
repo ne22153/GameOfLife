@@ -58,6 +58,7 @@ func GoLWorker(inputWorld [][]byte, p Shared.Params) [][]byte {
 		}
 		return inputWorld
 	}
+	//fmt.Println("Height : ", p.ImageHeight, " Width : ", p.ImageWidth)
 	newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
 	//currentWorld <- newWorld
 	inputWorld = newWorld
@@ -117,8 +118,10 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 	} else { //If the node is fresh and no previous GoL instance was running in the past
 		condition.Add(1)
 		res.World = GoLWorker(req.World, req.Parameters)
+		if req.Parameters.ImageWidth == 16 && req.Parameters.Turns == 1 {
+			fmt.Println(res.World)
+		}
 	}
-
 	return
 }
 
