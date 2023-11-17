@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"net"
@@ -32,8 +33,8 @@ var currentWorld currentWorldStruct
 
 //------------------CONSTANTS-------------------------
 
-// THREADS - Number of clients being used to run GoL
-const THREADS = 4
+// WORKERS - Number of clients being used to run GoL
+const WORKERS = 4
 const BUFFER = 2
 const LIVE = 255
 
@@ -79,10 +80,6 @@ func mergeWorkerStrips(newWorld [][]byte, workerChannelList []chan [][]byte, str
 		//worldSection is just a game slice from a specific worker
 		worldSection := <-(workerChannelList[i])
 		endBufferIndex := stripSizeList[i] + 1
-		/*if stripSizeList[i] == 4 && turns == 1 {
-			fmt.Println(worldSection)
-		}*/
-
 		//We don't add the top and end buffers (that's what the inner loop's doing)
 		newWorld = append(newWorld, worldSection[1:endBufferIndex]...)
 	}
@@ -92,10 +89,10 @@ func mergeWorkerStrips(newWorld [][]byte, workerChannelList []chan [][]byte, str
 
 func distributeSliceSizes(p Shared.Params) []int {
 
-	var stripSize = int(math.Ceil(float64(p.ImageHeight / THREADS)))
-	stripSizeList := make([]int, THREADS) //Each index is the strip size for the specific worker
+	var stripSize = int(math.Ceil(float64(p.ImageHeight / WORKERS)))
+	stripSizeList := make([]int, WORKERS) //Each index is the strip size for the specific worker
 
-	if (stripSize*THREADS)-p.ImageHeight == stripSize {
+	if (stripSize*WORKERS)-p.ImageHeight == stripSize {
 		stripSize--
 	}
 
@@ -138,7 +135,7 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 
 		strip = append(strip, world[topBuffer])
 		strip = append(strip, world[startIndex:endBuffer+1]...)
-	} else if workerNumber == THREADS-1 { //final worker
+	} else if workerNumber == WORKERS-1 { //final worker
 		topBuffer = currentY - 1
 		startIndex = currentY
 		endBuffer = 0
@@ -157,10 +154,7 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 }
 
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int) [][]byte {
-	//var sliceError = Clients[clientNum].Call(Shared.GoLHandler, &req, res)
-	//Shared.HandleError(sliceError)
-
-	handleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res)
+	Shared.HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res)
 
 	//For some reason the response differs from within the call and out of the call
 	//The difference seems to be random every call, so perhaps issues with response access?
@@ -201,8 +195,8 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 // GoLManager Breaks up the world and sends it to the workers
 func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) (err error) {
 	var waitGroup sync.WaitGroup
-	var workerChannelList = make([]chan [][]byte, THREADS)
-	for j := 0; j < THREADS; j++ {
+	var workerChannelList = make([]chan [][]byte, WORKERS)
+	for j := 0; j < WORKERS; j++ {
 		var workerChannel = make(chan [][]byte, 2)
 		workerChannelList[j] = workerChannel
 	}
@@ -211,7 +205,7 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 	changeCurrentWorld(req.World)
 	for i := 0; i < req.Parameters.Turns; i++ {
 		//We now do split the input world for each thread accordingly
-		for j := 0; j < THREADS; j++ {
+		for j := 0; j < WORKERS; j++ {
 			waitGroup.Add(1)
 			//We execute the workers concurrently
 			var request, response = createRequestResponsePair(req.Parameters, req.Events)
@@ -224,7 +218,6 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 		changeCurrentWorld(mergeWorkerStrips(res.World, workerChannelList, stripSizeList, req.Parameters.Turns))
 		changeCurrentTurn(i + 1)
 	}
-	//fmt.Println(currentWorld.world)
 	res.World = getCurrentWorld()
 	return
 }
@@ -242,9 +235,9 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 }
 
 func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response) (err error) {
-	for i := 0; i < THREADS; i++ {
+	for i := 0; i < WORKERS; i++ {
 		fmt.Println("Killing it", i)
-		go handleCallAndError(Clients[i], Shared.SuicideHandler, &request, response)
+		go Shared.HandleCallAndError(Clients[i], Shared.SuicideHandler, &request, response)
 		fmt.Println("Killed it", i)
 	}
 	//defer os.Exit(0)
@@ -252,9 +245,9 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 }
 
 func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared.Response) (err error) {
-	for i := 0; i < THREADS; i++ {
+	for i := 0; i < WORKERS; i++ {
 		fmt.Println("pausing it:", i)
-		go handleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
+		Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
 		fmt.Println("paused it:", i)
 	}
 	fmt.Println()
@@ -262,8 +255,8 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 }
 
 func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *Shared.Response) (err error) {
-	for i := 0; i < THREADS; i++ {
-		handleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
+	for i := 0; i < WORKERS; i++ {
+		Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
 	}
 	return
 }
@@ -276,14 +269,12 @@ func connectToWorkers() {
 	//This should be changed to AWS IPs when implemented beyond local machine
 	var clientsPorts = [4]string{"127.0.0.1:8031", "127.0.0.1:8032", "127.0.0.1:8033", "127.0.0.1:8034"}
 	var clientsConnections = [4]*rpc.Client{}
-	var err error
+
 	for i := 0; i < 4; i++ {
 		fmt.Println("Attempting to connect to : ", clientsPorts[i])
-		clientsConnections[i], err = rpc.Dial("tcp", clientsPorts[i])
-		if err != nil {
-			panic(err)
-		}
+		clientsConnections[i] = Shared.HandleCreateClientAndError(clientsPorts[i])
 	}
+
 	Clients = clientsConnections
 }
 
@@ -292,13 +283,13 @@ func main() {
 	pAddr := flag.String("port", "8030", "Port to listen on")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
-	var registerError = rpc.Register(&BrokerOperations{})
-	Shared.HandleError(registerError)
+
+	Shared.HandleRegisterAndError(&BrokerOperations{})
 	listener, _ := net.Listen("tcp", ":"+*pAddr)
 	defer func(listener net.Listener) {
 		err := listener.Close()
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 	}(listener)
 	go connectToWorkers()
