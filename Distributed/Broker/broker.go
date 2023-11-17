@@ -243,9 +243,9 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 
 func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < THREADS; i++ {
-		fmt.Println("Killing it")
+		fmt.Println("Killing it", i)
 		go handleCallAndError(Clients[i], Shared.SuicideHandler, &request, response)
-		fmt.Println("Killed it")
+		fmt.Println("Killed it", i)
 	}
 	//defer os.Exit(0)
 	return
@@ -253,8 +253,11 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 
 func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < THREADS; i++ {
-		handleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
+		fmt.Println("pausing it:", i)
+		go handleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
+		fmt.Println("paused it:", i)
 	}
+	fmt.Println()
 	return
 }
 
