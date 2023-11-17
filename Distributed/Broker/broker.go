@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"math"
 	"math/rand"
 	"net"
@@ -147,6 +148,7 @@ func createStrip(world [][]byte, stripSizeList []int, workerNumber, imageHeight,
 }
 
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int) {
+	//fmt.Println("Chosen client : ", Clients[clientNum])
 	var sliceError = Clients[clientNum].Call(Shared.GoLHandler, req, res)
 	Shared.HandleError(sliceError)
 	out <- res.World
@@ -188,7 +190,7 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 		var workerChannel = make(chan [][]byte, 2)
 		workerChannelList[j] = workerChannel
 	}
-
+	//time.Sleep(2 * time.Second)
 	var stripSizeList = distributeSliceSizes(req.Parameters)
 
 	for i := 0; i < req.Parameters.Turns; i++ {
@@ -219,24 +221,33 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 	return
 }
 
-func (s *BrokerOperations) KYS(request Shared.Request, response rpc.Response) (err error) {
+func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < THREADS; i++ {
-		Clients[i].Call(Shared.SuicideHandler, request, response)
+		err := Clients[i].Call(Shared.SuicideHandler, request, response)
+		if err != nil {
+			panic(err)
+		}
 	}
 	defer os.Exit(0)
 	return
 }
 
-func (s *BrokerOperations) pauseManager(request Shared.Request, response rpc.Response) (err error) {
+func (s *BrokerOperations) pauseManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < THREADS; i++ {
-		Clients[i].Call(Shared.PauseHandler, request, response)
+		err := Clients[i].Call(Shared.PauseHandler, request, response)
+		if err != nil {
+			panic(err)
+		}
 	}
 	return
 }
 
-func (s *BrokerOperations) BackgroundManager(request Shared.Request, response rpc.Response) (err error) {
+func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < THREADS; i++ {
-		Clients[i].Call(Shared.BackgroundHandler, request, response)
+		err := Clients[i].Call(Shared.BackgroundHandler, request, response)
+		if err != nil {
+			panic(err)
+		}
 	}
 	return
 }
@@ -246,30 +257,40 @@ func (s *BrokerOperations) BackgroundManager(request Shared.Request, response rp
 //Sets up the clients for the workers/nodes, called from main
 //Hard coded for 4 workers, arbitrary ports
 func connectToWorkers() {
+	fmt.Println("Made it")
 	//This should be changed to AWS IPs when implemented beyond local machine
 	var clientsPorts = [4]string{"127.0.0.1:8031", "127.0.0.1:8032", "127.0.0.1:8033", "127.0.0.1:8034"}
 	var clientsConnections = [4]*rpc.Client{}
+	var err error
 	for i := 0; i < 4; i++ {
-		clientsConnections[i], _ = rpc.Dial("tcp", clientsPorts[i])
+		fmt.Println("Attempting to connect to : ", clientsPorts[i])
+		clientsConnections[i], err = rpc.Dial("tcp", clientsPorts[i])
+		if err != nil {
+			panic(err)
+		}
 	}
 	Clients = clientsConnections
 }
 
 //Main sets up a listener to listen for controller
 func main() {
+	fmt.Println("Doing the stuff")
 	pAddr := flag.String("port", "8030", "Port to listen on")
 	flag.Parse()
+	fmt.Println("1")
 	rand.Seed(time.Now().UnixNano())
-	var registerError error = rpc.Register(&BrokerOperations{})
+	var registerError = rpc.Register(&BrokerOperations{})
 	Shared.HandleError(registerError)
+	fmt.Println("2")
 	listener, _ := net.Listen("tcp", ":"+*pAddr)
+	fmt.Println("3")
 	defer func(listener net.Listener) {
 		err := listener.Close()
 		if err != nil {
 			panic(err)
 		}
 	}(listener)
+	fmt.Println("4")
+	go connectToWorkers()
 	rpc.Accept(listener)
-
-	connectToWorkers()
 }

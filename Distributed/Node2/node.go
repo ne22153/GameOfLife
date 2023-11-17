@@ -52,7 +52,7 @@ func changeCurrentWorld(input [][]byte) {
 // GoLWorker does the actual working stuff
 func GoLWorker(inputWorld [][]byte, p Shared.Params) [][]byte {
 	var newWorld [][]byte
-	fmt.Println(p.Turns)
+	//fmt.Println(p.Turns)
 	if p.Turns == 0 {
 		if p.ImageHeight == 16 {
 			fmt.Println("Auto done: ", inputWorld)
@@ -157,7 +157,7 @@ func (s *GoLOperations) BackgroundManager(*Shared.Request, *Shared.Response) (er
 }
 
 func main() {
-	pAddr := flag.String("port", "8031", "Port to listen on")
+	pAddr := flag.String("port", "8032", "Port to listen on")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 	var registerError error = rpc.Register(&GoLOperations{})

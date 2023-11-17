@@ -264,7 +264,7 @@ Implement a Halo Exchange scheme, where workers communicate the halo regions dir
 
 ![Extension 2](content/cw_diagrams-Extensions_2.png)
 
-Add parallel workers within each distributed AWS Node 1.
+Add parallel workers within each distributed AWS Node1.
 
 Analyse the performance of your new solution and compare it with your previous implementation. Use various provided PGM images and analyse the effect on performance in context of the image size.
 
@@ -308,7 +308,7 @@ Additional marks are available for satisfying further success criteria, up to:
 
 ### Distributed Implementation (35 marks)
 
-40% - You must be able to demonstrate a distributed Game of Life implementation. It must be running a single AWS GoL Engine Node 1 that is controlled by a locally running Controller (see Step 1).
+40% - You must be able to demonstrate a distributed Game of Life implementation. It must be running a single AWS GoL Engine Node1 that is controlled by a locally running Controller (see Step 1).
 
 70% - Satisfy *all* success criteria for this stage.
 
