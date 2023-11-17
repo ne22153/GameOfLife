@@ -162,8 +162,7 @@ func main() {
 	pAddr := flag.String("port", "8031", "Port to listen on")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
-	var registerError error = rpc.Register(&GoLOperations{})
-	Shared.HandleError(registerError)
+	Shared.HandleRegisterAndError(&GoLOperations{})
 	listener, _ := net.Listen("tcp", ":"+*pAddr)
 	defer func(listener net.Listener) {
 		err := listener.Close()
