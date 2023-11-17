@@ -158,8 +158,10 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 }
 
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int) [][]byte {
-	var sliceError = Clients[clientNum].Call(Shared.GoLHandler, req, res)
-	Shared.HandleError(sliceError)
+	//var sliceError = Clients[clientNum].Call(Shared.GoLHandler, &req, res)
+	//Shared.HandleError(sliceError)
+
+	handleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res)
 
 	//For some reason the response differs from within the call and out of the call
 	//The difference seems to be random every call, so perhaps issues with response access?
