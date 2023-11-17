@@ -22,8 +22,7 @@ type DistributorChannels struct {
 //Main logic where we control all of our AWS nodes. Also controls the ticker and keypress logic as well.
 func controller(params Shared.Params, channels DistributorChannels, keyPresses <-chan rune) {
 	fmt.Println("Server port: ", params.ServerPort)
-	client, dialError := rpc.Dial("tcp", params.ServerPort)
-	Shared.HandleError(dialError)
+	var client *rpc.Client = Shared.HandleCreateClientAndError(params.ServerPort)
 
 	//Create request response pair
 	request, response := createRequestResponsePair(params, channels)
@@ -35,6 +34,7 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	go aliveCellsReporter(ticker, channels, client, &request, response)
 	go determineKeyPress(client, keyPresses, &request, response, ticker, channels)
 
+	//We set up our broker
 	handleCallAndError(client, Shared.BrokerHandler, &request, response)
 	channels.events <- Shared.FinalTurnComplete{
 		CompletedTurns: params.Turns,
@@ -42,7 +42,6 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 
 	//Shut down the game safely
 	defer handleGameShutDown(client, response, params, channels, ticker)
-	//os.Exit(0)
 }
 
 func main() {

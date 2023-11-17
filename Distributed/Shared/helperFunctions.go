@@ -1,6 +1,8 @@
 package Shared
 
-import "net/rpc"
+import (
+	"net/rpc"
+)
 
 // HandleCallAndError General helper function
 //Wraps a common call-error pattern into a function. performs a call then handles any errors if necessary
