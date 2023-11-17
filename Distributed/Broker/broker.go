@@ -244,10 +244,7 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 
 func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < THREADS; i++ {
-		err := Clients[i].Call(Shared.SuicideHandler, request, response)
-		if err != nil {
-			panic(err)
-		}
+		handleCallAndError(Clients[i], Shared.SuicideHandler, &request, response)
 	}
 	defer os.Exit(0)
 	return
@@ -255,20 +252,14 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 
 func (s *BrokerOperations) pauseManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < THREADS; i++ {
-		err := Clients[i].Call(Shared.PauseHandler, request, response)
-		if err != nil {
-			panic(err)
-		}
+		handleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
 	}
 	return
 }
 
 func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < THREADS; i++ {
-		err := Clients[i].Call(Shared.BackgroundHandler, request, response)
-		if err != nil {
-			panic(err)
-		}
+		handleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
 	}
 	return
 }
