@@ -38,7 +38,7 @@ const WORKERS = 4
 const BUFFER = 2
 const LIVE = 255
 
-//------------------SETTERS FOR LOCKED GLOBALS-------------------------
+//------------------GETTERS AND SETTERS FOR LOCKED GLOBALS-------------------------
 
 func changeCurrentTurn(input int) {
 	currentTurn.lock.Lock()
@@ -59,17 +59,12 @@ func getCurrentWorld() [][]byte {
 	return temp
 }
 
-//The purpose of the broker is to receive an RPC call from the controller
-// and receive / start the necessary data processing in the node
-
-//It should hold all the connection information for the nodes, and the
-// controller should only contain the connection information for the broker
-
-//It should break up the inputWorld into smaller bits based on the number of
-// connected workers and send the different chunks to each worker
-
-//It should receive the processed strips from each worker and reassemble them
-// to send back to the controller
+func getCurrentTurn() int {
+	currentTurn.lock.Lock()
+	var temp = currentTurn.turn
+	currentTurn.lock.Unlock()
+	return temp
+}
 
 type BrokerOperations struct{}
 
@@ -90,7 +85,8 @@ func mergeWorkerStrips(newWorld [][]byte, workerChannelList []chan [][]byte, str
 func distributeSliceSizes(p Shared.Params) []int {
 
 	var stripSize = int(math.Ceil(float64(p.ImageHeight / WORKERS)))
-	stripSizeList := make([]int, WORKERS) //Each index is the strip size for the specific worker
+	//Each index is the strip size for the specific worker
+	stripSizeList := make([]int, WORKERS)
 
 	if (stripSize*WORKERS)-p.ImageHeight == stripSize {
 		stripSize--
@@ -115,8 +111,6 @@ func distributeSliceSizes(p Shared.Params) []int {
 }
 
 func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [][]byte {
-	//fmt.Println(stripSizeList)
-	//fmt.Println(workerNumber)
 	var topBuffer int
 	var endBuffer int
 	var startIndex int
@@ -135,6 +129,7 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 
 		strip = append(strip, world[topBuffer])
 		strip = append(strip, world[startIndex:endBuffer+1]...)
+
 	} else if workerNumber == WORKERS-1 { //final worker
 		topBuffer = currentY - 1
 		startIndex = currentY
@@ -142,6 +137,7 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 
 		strip = append(strip, world[topBuffer:imageHeight]...)
 		strip = append(strip, world[0])
+		
 	} else { //middle workers
 		topBuffer = currentY - 1
 		startIndex = currentY
@@ -156,12 +152,6 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int) [][]byte {
 	Shared.HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res)
 
-	//For some reason the response differs from within the call and out of the call
-	//The difference seems to be random every call, so perhaps issues with response access?
-
-	if req.Parameters.ImageWidth == 16 && req.Parameters.Turns == 1 {
-		fmt.Println("\n", clientNum+1, res.World)
-	}
 	return res.World
 }
 
@@ -228,9 +218,7 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 	res.AliveCells = getAliveCellsCount(currentWorld.world)
 	currentWorld.lock.Unlock()
 
-	currentTurn.lock.Lock()
-	res.Turns = currentTurn.turn
-	currentTurn.lock.Unlock()
+	res.Turns = getCurrentTurn()
 	return
 }
 

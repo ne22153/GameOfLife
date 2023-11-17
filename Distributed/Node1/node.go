@@ -108,8 +108,9 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 	//There already existed a GoL instance running (due to keypress Q, do this)
 	if paused.pause {
 		//Restarts the GoL instance running
-		paused.lock.Unlock()
+		fmt.Println("continuing old")
 		paused.pause = !paused.pause
+		paused.lock.Unlock()
 
 		condition.Wait()
 		currentWorld.lock.Lock()
@@ -128,7 +129,7 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 // KYS :Handler whenever the user presses "K".
 //Called from the local controller to tell the AWS node to kill itself
 func (s *GoLOperations) KYS(*Shared.Request, *Shared.Response) (err error) {
-	fmt.Println("Terminated sucessfully")
+	fmt.Println("Terminated successfully")
 
 	defer os.Exit(0)
 	return

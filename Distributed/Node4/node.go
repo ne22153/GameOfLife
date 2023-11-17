@@ -108,8 +108,8 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 	//There already existed a GoL instance running (due to keypress Q, do this)
 	if paused.pause {
 		//Restarts the GoL instance running
-		paused.lock.Unlock()
 		paused.pause = !paused.pause
+		paused.lock.Unlock()
 
 		condition.Wait()
 		currentWorld.lock.Lock()
