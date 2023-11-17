@@ -139,6 +139,7 @@ func (s *GoLOperations) KYS(*Shared.Request, *Shared.Response) (err error) {
 //If already paused then unpause, otherwise pause.
 func (s *GoLOperations) PauseManager(*Shared.Request, *Shared.Response) (err error) {
 	if paused.pause {
+		fmt.Println("Unlocking")
 		paused.lock.Unlock()
 	} else {
 		fmt.Println("Locking")
