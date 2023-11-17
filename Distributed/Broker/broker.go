@@ -215,9 +215,11 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 		for j := 0; j < THREADS; j++ {
 			waitGroup.Add(1)
 			//We execute the workers concurrently
-			go executeWorker(req.World, workerChannelList,
+			var request, response = createRequestResponsePair(req.Parameters, req.Events)
+			request.World = getCurrentWorld()
+			go executeWorker(request.World, workerChannelList,
 				stripSizeList[j], req.Parameters.ImageHeight, req.Parameters.ImageWidth, j,
-				&waitGroup, req, res)
+				&waitGroup, request, response)
 		}
 		waitGroup.Wait()
 		changeCurrentWorld(mergeWorkerStrips(res.World, workerChannelList, stripSizeList, req.Parameters.Turns))
