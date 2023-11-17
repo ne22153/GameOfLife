@@ -30,6 +30,13 @@ type currentWorldStruct struct {
 
 var currentWorld currentWorldStruct
 
+type pauseStruct struct {
+	pause bool
+	lock  sync.Mutex
+}
+
+var paused pauseStruct
+
 //------------------CONSTANTS-------------------------
 
 // WORKERS - Number of clients being used to run GoL
@@ -51,6 +58,12 @@ func changeCurrentWorld(input [][]byte) {
 	currentWorld.lock.Unlock()
 }
 
+func changePaused() {
+	paused.lock.Lock()
+	paused.pause = !paused.pause
+	paused.lock.Unlock()
+}
+
 func getCurrentWorld() [][]byte {
 	currentWorld.lock.Lock()
 	var temp = currentWorld.world
@@ -62,6 +75,13 @@ func getCurrentTurn() int {
 	currentTurn.lock.Lock()
 	var temp = currentTurn.turn
 	currentTurn.lock.Unlock()
+	return temp
+}
+
+func getPaused() bool {
+	paused.lock.Lock()
+	var temp = paused.pause
+	paused.lock.Unlock()
 	return temp
 }
 
