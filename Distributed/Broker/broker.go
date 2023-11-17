@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"net"
 	"net/rpc"
-	"os"
 	"sync"
 	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
@@ -199,7 +198,7 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 
 //------------------INCOMING RPC CALLS-------------------------
 
-//Breaks up the world and sends it to the workers
+// GoLManager Breaks up the world and sends it to the workers
 func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) (err error) {
 	var waitGroup sync.WaitGroup
 	var workerChannelList = make([]chan [][]byte, THREADS)
@@ -244,13 +243,15 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 
 func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < THREADS; i++ {
-		handleCallAndError(Clients[i], Shared.SuicideHandler, &request, response)
+		fmt.Println("Killing it")
+		go handleCallAndError(Clients[i], Shared.SuicideHandler, &request, response)
+		fmt.Println("Killed it")
 	}
-	defer os.Exit(0)
+	//defer os.Exit(0)
 	return
 }
 
-func (s *BrokerOperations) pauseManager(request Shared.Request, response *Shared.Response) (err error) {
+func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < THREADS; i++ {
 		handleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
 	}
