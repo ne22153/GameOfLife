@@ -20,7 +20,7 @@ func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels,
 		//When the ticker triggers,
 		//we send an RPC call to return the number of alive cells, and number of turns processed
 		case <-ticker.C:
-			handleCallAndError(client, Shared.BrokerInfo, request, response)
+			Shared.HandleCallAndError(client, Shared.BrokerInfo, request, response)
 			c.events <- Shared.AliveCellsCount{
 				CompletedTurns: response.Turns,
 				CellsCount:     response.AliveCells}
@@ -70,14 +70,6 @@ func handleCloseClient(client *rpc.Client) {
 }
 
 //General helper function
-//Wraps a common call-error pattern into a function. performs a call then handles any errors if necessary
-func handleCallAndError(client *rpc.Client, namedFunctionHandler string,
-	request *Shared.Request, response *Shared.Response) {
-	var namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
-	Shared.HandleError(namedFunctionHandlerError)
-}
-
-//General helper function
 //Set the io to idle and ticker to stop and close the client
 func shutDownIOTickerClient(c DistributorChannels, ticker *time.Ticker, client *rpc.Client) {
 	ticker.Stop()
@@ -108,27 +100,23 @@ func determineKeyPress(client *rpc.Client, keyPresses <-chan rune,
 		select {
 		case key := <-keyPresses:
 			if key == 'k' {
-				handleCallAndError(client, Shared.BrokerInfo, req, res)
-				handleCallAndError(client, Shared.BrokerKill, req, res)
+				Shared.HandleCallAndError(client, Shared.BrokerInfo, req, res)
+				Shared.HandleCallAndError(client, Shared.BrokerKill, req, res)
 				handleGameShutDown(client, res, req.Parameters, c, ticker)
 				os.Exit(0)
 			} else if key == 's' {
-				handleCallAndError(client, Shared.BrokerInfo, req, res)
+				Shared.HandleCallAndError(client, Shared.BrokerInfo, req, res)
 				var filename = strconv.Itoa(req.Parameters.ImageWidth) + "x" +
 					strconv.Itoa(req.Parameters.ImageHeight) + "x" +
 					strconv.Itoa(res.Turns)
 				writeToFileIO(res.World, req.Parameters, filename, c)
 			} else if key == 'p' {
 				fmt.Println("Continuing")
-				handleCallAndError(client, Shared.BrokerPause, req, res)
+				Shared.HandleCallAndError(client, Shared.BrokerPause, req, res)
 			} else if key == 'q' {
-				handleCallAndError(client, Shared.BrokerBackground, req, res)
-				handleCallAndError(client, Shared.BrokerInfo, req, res)
-				ticker.Stop()
-				c.ioCommand <- ioCheckIdle
-				<-c.ioIdle
-
-				handleCloseClient(client)
+				Shared.HandleCallAndError(client, Shared.BrokerBackground, req, res)
+				Shared.HandleCallAndError(client, Shared.BrokerInfo, req, res)
+				shutDownIOTickerClient(c, ticker, client)
 				os.Exit(0)
 			}
 		}

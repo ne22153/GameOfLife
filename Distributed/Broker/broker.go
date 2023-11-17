@@ -115,6 +115,8 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 	return
 }
 
+// KYS :Handler whenever the user presses "K".
+//Called from the local controller to tell the AWS node to kill itself
 func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
 		fmt.Println("Killing it", i)
@@ -125,6 +127,8 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 	return
 }
 
+// PauseManager :Handler whenever the user presses "p". Transmits Pause commands to Workers
+//If already paused then unpause, otherwise pause.
 func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
 		fmt.Println("pausing it:", i)
@@ -135,6 +139,9 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 	return
 }
 
+// BackgroundManager :Handler whenever the user presses "q"
+//	When the local controller is killed, then pause the node and then wait until a new local controller is created
+// This is a form of fault tolerance.
 func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
 		Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
@@ -151,6 +158,7 @@ func connectToWorkers() {
 	var clientsPorts = [4]string{"127.0.0.1:8031", "127.0.0.1:8032", "127.0.0.1:8033", "127.0.0.1:8034"}
 	var clientsConnections = [4]*rpc.Client{}
 
+	//Initialize our clients
 	for i := 0; i < 4; i++ {
 		fmt.Println("Attempting to connect to : ", clientsPorts[i])
 		clientsConnections[i] = Shared.HandleCreateClientAndError(clientsPorts[i])
@@ -173,7 +181,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}(listener)
-	
+
 	go connectToWorkers()
 	rpc.Accept(listener)
 }
