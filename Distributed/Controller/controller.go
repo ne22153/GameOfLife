@@ -35,7 +35,7 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	go determineKeyPress(client, keyPresses, &request, response, ticker, channels)
 
 	//We set up our broker
-	handleCallAndError(client, Shared.BrokerHandler, &request, response)
+	Shared.HandleCallAndError(client, Shared.BrokerHandler, &request, response)
 	channels.events <- Shared.FinalTurnComplete{
 		CompletedTurns: params.Turns,
 		Alive:          calculateAliveCells(response.World)}
