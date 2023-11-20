@@ -145,7 +145,7 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
 		fmt.Println("pausing it:", i)
-		Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
+		go Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
 		fmt.Println("paused it:", i)
 	}
 	fmt.Println()
@@ -157,7 +157,9 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 // This is a form of fault tolerance.
 func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
-		Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
+		fmt.Println("pausing it for q:", i)
+		go Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
+		fmt.Println("paused it for q:", i)
 	}
 	return
 }
