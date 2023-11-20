@@ -37,6 +37,14 @@ type pauseStruct struct {
 
 var paused pauseStruct
 
+var workerChannelList = make([]chan [][]byte, WORKERS)
+
+var stripSizeList []int
+
+var prevWaitGroup sync.WaitGroup
+
+var controller *rpc.Client
+
 //------------------CONSTANTS-------------------------
 
 // WORKERS - Number of clients being used to run GoL
@@ -89,17 +97,39 @@ type BrokerOperations struct{}
 
 //------------------INCOMING RPC CALLS-------------------------
 
+func (s *BrokerOperations) Hi(req Shared.Request, res *Shared.Response) (err error) {
+	fmt.Println("Hi")
+	return
+}
+
 // GoLManager Breaks up the world and sends it to the workers
 func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) (err error) {
 	var waitGroup sync.WaitGroup
-	var workerChannelList = make([]chan [][]byte, WORKERS)
+	//fmt.Println("Pause: ", getPaused())
+	var turn int
+
+	if paused.pause {
+		fmt.Println("Continuing old")
+		paused.pause = !paused.pause
+		paused.lock.Unlock()
+		for i := 0; i < WORKERS; i++ {
+			Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &req, res)
+		}
+
+		turn = getCurrentTurn()
+	} else {
+		fmt.Println("I ain't paused yet")
+		turn = 0
+		changeCurrentWorld(req.World)
+	}
+	//waitGroup.Wait()
+	//prevWaitGroup = waitGroup
 	for j := 0; j < WORKERS; j++ {
 		var workerChannel = make(chan [][]byte, 2)
 		workerChannelList[j] = workerChannel
 	}
-	var stripSizeList = distributeSliceSizes(req.Parameters)
-	changeCurrentWorld(req.World)
-	for i := 0; i < req.Parameters.Turns; i++ {
+	stripSizeList = distributeSliceSizes(req.Parameters)
+	for i := turn; i < req.Parameters.Turns; i++ {
 		//We now do split the input world for each thread accordingly
 		for j := 0; j < WORKERS; j++ {
 			waitGroup.Add(1)
@@ -111,10 +141,16 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 				&waitGroup, request, response)
 		}
 		waitGroup.Wait()
-		changeCurrentWorld(mergeWorkerStrips(res.World, workerChannelList, stripSizeList))
+		var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
 		changeCurrentTurn(i + 1)
+		reportToController(req.Parameters, req.Events, getCurrentWorld(), newWorld)
+		changeCurrentWorld(newWorld)
+
+		paused.lock.Lock()
+		paused.lock.Unlock()
 	}
 	res.World = getCurrentWorld()
+	fmt.Println("Returning info")
 	return
 }
 
@@ -144,10 +180,9 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 //If already paused then unpause, otherwise pause.
 func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
-		fmt.Println("pausing it:", i)
 		go Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
-		fmt.Println("paused it:", i)
 	}
+	changePaused()
 	fmt.Println()
 	return
 }
@@ -157,10 +192,11 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 // This is a form of fault tolerance.
 func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
-		fmt.Println("pausing it for q:", i)
 		go Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
-		fmt.Println("paused it for q:", i)
 	}
+	changePaused()
+	fmt.Println("Paused after kill: ", getPaused())
+	paused.lock.Lock()
 	return
 }
 
@@ -198,5 +234,7 @@ func main() {
 	}(listener)
 
 	go connectToWorkers()
+	controller = Shared.HandleCreateClientAndError("127.0.0.1:8035")
+
 	rpc.Accept(listener)
 }

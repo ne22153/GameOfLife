@@ -146,3 +146,10 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 
 	return aliveCells
 }
+
+func reportToController(p Shared.Params, events chan<- Shared.Event, oldWorld [][]byte, newWorld [][]byte) {
+	request, response := createRequestResponsePair(p, events)
+	request.OldWorld = oldWorld
+	request.World = newWorld
+	Shared.HandleCallAndError(controller, Shared.ControllerHandler, &request, response)
+}

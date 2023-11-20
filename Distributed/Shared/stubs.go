@@ -24,6 +24,8 @@ var BrokerKill = "BrokerOperations.KYS"
 var BrokerPause = "BrokerOperations.PauseManager"
 var BrokerBackground = "BrokerOperations.BackgroundManager"
 
+var ControllerHandler = "ControllerOperations.CellReporter"
+
 type Response struct {
 	World      [][]byte
 	AliveCells int
@@ -39,6 +41,7 @@ type Request struct {
 	CallAlive    chan int
 	GetAlive     chan int
 	GetTurn      chan int
+	OldWorld     [][]byte
 }
 
 func HandleError(err error) {

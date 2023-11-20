@@ -106,7 +106,7 @@ type GoLOperations struct{}
 // GoLManager :Handler for the actual GoL algorithm
 func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (err error) {
 	//There already existed a GoL instance running (due to keypress Q, do this)
-	if paused.pause {
+	/*if paused.pause {
 		//Restarts the GoL instance running
 		paused.pause = !paused.pause
 		paused.lock.Unlock()
@@ -115,12 +115,11 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 		currentWorld.lock.Lock()
 		res.World = currentWorld.world
 		currentWorld.lock.Unlock()
-	} else { //If the node is fresh and no previous GoL instance was running in the past
-		condition.Add(1)
-		res.World = GoLWorker(req.World, req.Parameters)
-		if req.Parameters.ImageWidth == 16 && req.Parameters.Turns == 1 {
-			fmt.Println(res.World)
-		}
+	} else {*/ //If the node is fresh and no previous GoL instance was running in the past
+	condition.Add(1)
+	res.World = GoLWorker(req.World, req.Parameters)
+	if req.Parameters.ImageWidth == 16 && req.Parameters.Turns == 1 {
+		fmt.Println(res.World)
 	}
 
 	return
@@ -147,6 +146,7 @@ func (s *GoLOperations) PauseManager(*Shared.Request, *Shared.Response) (err err
 		paused.lock.Lock()
 	}
 	paused.pause = !paused.pause
+	fmt.Println(paused.pause)
 	return
 }
 

@@ -24,7 +24,7 @@ func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels,
 			c.events <- Shared.AliveCellsCount{
 				CompletedTurns: response.Turns,
 				CellsCount:     response.AliveCells}
-			fmt.Println("On turn: ", response.Turns, ", Alive cells: ", response.AliveCells)
+			//fmt.Println("On turn: ", response.Turns, ", Alive cells: ", response.AliveCells)
 		}
 	}
 }
@@ -88,6 +88,7 @@ func handleGameShutDown(client *rpc.Client, response *Shared.Response,
 	writeToFileIO(response.World, p, filename, c)
 	shutDownIOTickerClient(c, ticker, client)
 	close(c.events)
+	os.Exit(0)
 }
 
 //Helper function of controller
@@ -95,7 +96,7 @@ func handleGameShutDown(client *rpc.Client, response *Shared.Response,
 func determineKeyPress(client *rpc.Client, keyPresses <-chan rune,
 	req *Shared.Request, res *Shared.Response,
 	ticker *time.Ticker, c DistributorChannels) {
-	//We makes sure this runs forever while the controller is alive
+	//We make sure this runs forever while the controller is alive
 	for {
 		select {
 		case key := <-keyPresses:

@@ -8,6 +8,7 @@ import (
 //Wraps a common call-error pattern into a function. performs a call then handles any errors if necessary
 func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 	request *Request, response *Response) {
+	//fmt.Println(namedFunctionHandler)
 	var namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
 	HandleError(namedFunctionHandlerError)
 }
@@ -16,6 +17,7 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 //Wraps a dial-error pattern into a functions. Creates a client. handles any errors if necessary.
 func HandleCreateClientAndError(serverPort string) *rpc.Client {
 	client, dialError := rpc.Dial("tcp", serverPort)
+
 	HandleError(dialError)
 
 	return client

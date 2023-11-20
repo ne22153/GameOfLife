@@ -7,7 +7,7 @@ import (
 
 func Run(p Params, events <-chan Event, keyPresses chan<- rune) {
 	w := NewWindow(int32(p.ImageWidth), int32(p.ImageHeight))
-
+sdlLoop:
 	for {
 		event := w.PollEvent()
 		if event != nil {
@@ -31,18 +31,18 @@ func Run(p Params, events <-chan Event, keyPresses chan<- rune) {
 				}
 			}
 		}
-		/*select {
+		select {
 		case event, ok := <-events:
 			if !ok {
 				w.Destroy()
 				break sdlLoop
 			}
 			switch e := event.(type) {
-			case gol.CellFlipped:
+			case CellFlipped:
 				w.FlipPixel(e.Cell.X, e.Cell.Y)
-			case gol.TurnComplete:
+			case TurnComplete:
 				w.RenderFrame()
-			case gol.FinalTurnComplete:
+			case FinalTurnComplete:
 				w.Destroy()
 				break sdlLoop
 			default:
@@ -52,7 +52,7 @@ func Run(p Params, events <-chan Event, keyPresses chan<- rune) {
 			}
 		default:
 			break
-		}*/
+		}
 	}
 
 }
