@@ -11,7 +11,7 @@ func createRequestResponsePair(p Shared.Params, events chan<- Shared.Event) (Sha
 
 	//Forms the request which contains the [][]byte version of the PGM file
 	request := Shared.Request{
-		World:       nil,
+		World:       getCurrentWorld(),
 		Parameters:  p,
 		Events:      events,
 		CurrentTurn: make(chan int, 1),
@@ -151,5 +151,6 @@ func reportToController(p Shared.Params, events chan<- Shared.Event, oldWorld []
 	request, response := createRequestResponsePair(p, events)
 	request.OldWorld = oldWorld
 	request.World = newWorld
+	request.Turn = getCurrentTurn()
 	Shared.HandleCallAndError(controller, Shared.ControllerHandler, &request, response)
 }

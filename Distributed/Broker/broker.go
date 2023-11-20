@@ -143,7 +143,7 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 		waitGroup.Wait()
 		var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
 		changeCurrentTurn(i + 1)
-		reportToController(req.Parameters, req.Events, getCurrentWorld(), newWorld)
+		//reportToController(req.Parameters, req.Events, getCurrentWorld(), newWorld)
 		changeCurrentWorld(newWorld)
 
 		paused.lock.Lock()
@@ -234,7 +234,7 @@ func main() {
 	}(listener)
 
 	go connectToWorkers()
-	controller = Shared.HandleCreateClientAndError("127.0.0.1:8035")
+	//controller = Shared.HandleCreateClientAndError("127.0.0.1:8035")
 
 	rpc.Accept(listener)
 }

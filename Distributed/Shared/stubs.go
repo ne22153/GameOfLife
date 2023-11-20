@@ -42,6 +42,7 @@ type Request struct {
 	GetAlive     chan int
 	GetTurn      chan int
 	OldWorld     [][]byte
+	Turn         int
 }
 
 func HandleError(err error) {

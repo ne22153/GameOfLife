@@ -11,6 +11,8 @@ import (
 
 const LIVE = 255
 
+var Channels DistributorChannels
+
 type DistributorChannels struct {
 	events    chan<- Shared.Event
 	ioCommand chan<- IoCommand
@@ -28,11 +30,11 @@ func (s *ControllerOperations) CellsReporter(req Shared.Request, res *Shared.Res
 		for j := 0; j < req.Parameters.ImageWidth; j++ {
 			//If the cell has changed since the last iteration, we need to send an event to say so
 			if req.OldWorld[i][j] != req.World[i][j] {
-				c.events <- CellFlipped{CompletedTurns: turn, Cell: util.Cell{X: j, Y: i}}
+				Channels.events <- Shared.CellFlipped{CompletedTurns: req.Turn, Cell: util.Cell{X: j, Y: i}}
 			}
 		}
 	}
-	c.events <- TurnComplete{turn}
+	Channels.events <- Shared.TurnComplete{req.Turn}
 	return
 }
 
@@ -67,7 +69,7 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	//We set up our broker
 	fmt.Println("Sending a call")
 	flipWorldCellsInitial(request.World, request.Parameters.ImageHeight, request.Parameters.ImageWidth, 0, channels)
-	channels.events <- Shared.TurnComplete{}
+	//channels.events <- Shared.TurnComplete{}
 	Shared.HandleCallAndError(client, Shared.BrokerHandler, &request, response)
 	channels.events <- Shared.FinalTurnComplete{
 		CompletedTurns: params.Turns,
@@ -120,6 +122,15 @@ func main() {
 	keyPresses := make(chan rune, 10)
 	events := make(chan Shared.Event, 1000)
 
+	/*listener, _ := net.Listen("tcp", ":8035")
+	defer func(listener net.Listener) {
+		err := listener.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(listener)*/
+
 	go Run(params, events, keyPresses)
 	Shared.Run(params, events, keyPresses)
+	//rpc.Accept(listener)
 }
