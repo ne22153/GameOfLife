@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"math"
+	"net/rpc"
 	"sync"
+	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 )
 
@@ -109,8 +111,10 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 }
 
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int) [][]byte {
-	Shared.HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res)
-
+	j := HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum)
+	if j != 0 {
+		
+	}
 	//For some reason the response differs from within the call and out of the call
 	//The difference seems to be random every call, so perhaps issues with response access?
 
@@ -153,4 +157,26 @@ func reportToController(p Shared.Params, events chan<- Shared.Event, oldWorld []
 	request.World = newWorld
 	request.Turn = getCurrentTurn()
 	Shared.HandleCallAndError(controller, Shared.ControllerHandler, &request, response)
+}
+
+func HandleCreateClientAndError(serverPort string) *rpc.Client {
+	client, dialError := rpc.Dial("tcp", serverPort)
+
+	if dialError != nil {
+		time.Sleep(1 * time.Second)
+		HandleCreateClientAndError(serverPort)
+	}
+
+	return client
+}
+
+func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
+	request *Shared.Request, response *Shared.Response, clientNum int) int {
+	var namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
+	if namedFunctionHandlerError != nil {
+		client := HandleCreateClientAndError(clientsPorts[clientNum])
+		Clients[clientNum] = client
+		return 1
+	}
+	return 0
 }

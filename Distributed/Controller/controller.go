@@ -42,7 +42,7 @@ func flipWorldCellsInitial(world [][]byte, imageHeight, imageWidth, turn int, c 
 	for i := 0; i < imageHeight; i++ {
 		for j := 0; j < imageWidth; j++ {
 			if world[i][j] == LIVE {
-				fmt.Println("Cell flipped")
+				//fmt.Println("Cell flipped")
 				c.events <- Shared.CellFlipped{CompletedTurns: turn, Cell: util.Cell{X: j, Y: i}}
 			}
 		}

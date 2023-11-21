@@ -41,9 +41,9 @@ var workerChannelList = make([]chan [][]byte, WORKERS)
 
 var stripSizeList []int
 
-var prevWaitGroup sync.WaitGroup
-
 var controller *rpc.Client
+
+var clientsPorts [4]string
 
 //------------------CONSTANTS-------------------------
 
@@ -104,6 +104,7 @@ func (s *BrokerOperations) Hi(req Shared.Request, res *Shared.Response) (err err
 
 // GoLManager Breaks up the world and sends it to the workers
 func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) (err error) {
+setback:
 	var waitGroup sync.WaitGroup
 	//fmt.Println("Pause: ", getPaused())
 	var turn int
@@ -113,7 +114,11 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 		paused.pause = !paused.pause
 		paused.lock.Unlock()
 		for i := 0; i < WORKERS; i++ {
-			Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &req, res)
+			j := HandleCallAndError(Clients[i], Shared.PauseHandler, &req, res, i)
+			if j != 0 {
+				fmt.Println("going to the start ")
+				goto setback
+			}
 		}
 
 		turn = getCurrentTurn()
@@ -169,7 +174,7 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
 		fmt.Println("Killing it", i)
-		go Shared.HandleCallAndError(Clients[i], Shared.SuicideHandler, &request, response)
+		go func() { HandleCallAndError(Clients[i], Shared.SuicideHandler, &request, response, i) }()
 		fmt.Println("Killed it", i)
 	}
 	//defer os.Exit(0)
@@ -180,7 +185,7 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 //If already paused then unpause, otherwise pause.
 func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
-		go Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
+		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i) }()
 	}
 	changePaused()
 	fmt.Println()
@@ -192,7 +197,7 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 // This is a form of fault tolerance.
 func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
-		go Shared.HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response)
+		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i) }()
 	}
 	changePaused()
 	fmt.Println("Paused after kill: ", getPaused())
@@ -206,11 +211,11 @@ func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *S
 //Hard coded for 4 workers, arbitrary ports
 func connectToWorkers() {
 	//This should be changed to AWS IPs when implemented beyond local machine
-	var clientsPorts = [4]string{"127.0.0.1:8031", "127.0.0.1:8032", "127.0.0.1:8033", "127.0.0.1:8034"}
-	var clientsConnections = [4]*rpc.Client{}
+	clientsPorts = [4]string{"127.0.0.1:8031", "127.0.0.1:8032", "127.0.0.1:8033", "127.0.0.1:8034"}
+	var clientsConnections [4]*rpc.Client
 
 	//Initialize our clients
-	for i := 0; i < 4; i++ {
+	for i := 0; i < len(clientsPorts); i++ {
 		fmt.Println("Attempting to connect to : ", clientsPorts[i])
 		clientsConnections[i] = Shared.HandleCreateClientAndError(clientsPorts[i])
 	}
