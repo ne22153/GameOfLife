@@ -161,6 +161,7 @@ func (s *GoLOperations) BackgroundManager(*Shared.Request, *Shared.Response) (er
 }
 
 func main() {
+	fmt.Println("hi")
 	pAddr := flag.String("port", "8030", "Port to listen on")
 	fmt.Println(*pAddr)
 	flag.Parse()
