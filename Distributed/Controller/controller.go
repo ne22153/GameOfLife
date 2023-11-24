@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
+	"uk.ac.bris.cs/gameoflife/Distributed/SharedSDL"
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -131,6 +132,6 @@ func main() {
 	}(listener)*/
 
 	go Run(params, events, keyPresses)
-	Shared.Run(params, events, keyPresses)
+	SharedSDL.Run(params, events, keyPresses)
 	//rpc.Accept(listener)
 }

@@ -1,11 +1,12 @@
-package Shared
+package SharedSDL
 
 import (
 	"fmt"
 	"github.com/veandco/go-sdl2/sdl"
+	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 )
 
-func Run(p Params, events <-chan Event, keyPresses chan<- rune) {
+func Run(p Shared.Params, events <-chan Shared.Event, keyPresses chan<- rune) {
 	w := NewWindow(int32(p.ImageWidth), int32(p.ImageHeight))
 sdlLoop:
 	for {
@@ -38,11 +39,11 @@ sdlLoop:
 				break sdlLoop
 			}
 			switch e := event.(type) {
-			case CellFlipped:
+			case Shared.CellFlipped:
 				w.FlipPixel(e.Cell.X, e.Cell.Y)
-			case TurnComplete:
+			case Shared.TurnComplete:
 				w.RenderFrame()
-			case FinalTurnComplete:
+			case Shared.FinalTurnComplete:
 				w.Destroy()
 				break sdlLoop
 			default:

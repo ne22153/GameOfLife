@@ -1,4 +1,4 @@
-package Shared
+package SharedSDL
 
 import (
 	"fmt"
