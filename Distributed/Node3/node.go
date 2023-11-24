@@ -166,6 +166,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	Shared.HandleRegisterAndError(&GoLOperations{})
 	listener, _ := net.Listen("tcp", ":"+*pAddr)
+	fmt.Println("Waiting")
 	defer func(listener net.Listener) {
 		err := listener.Close()
 		if err != nil {
