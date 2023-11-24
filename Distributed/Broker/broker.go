@@ -147,10 +147,16 @@ setback:
 				&waitGroup, request, response)
 		}
 		waitGroup.Wait()
-		var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
-		changeCurrentTurn(i + 1)
+		if !res.Resend {
+			var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
+			changeCurrentTurn(i + 1)
+			changeCurrentWorld(newWorld)
+		} else {
+			changePaused()
+			goto setback //Jump back to the start if anything reconnects.
+		}
+
 		//reportToController(req.Parameters, req.Events, getCurrentWorld(), newWorld)
-		changeCurrentWorld(newWorld)
 
 		paused.lock.Lock()
 		paused.lock.Unlock()
@@ -216,7 +222,8 @@ func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *S
 //Hard coded for 4 workers, arbitrary ports
 func connectToWorkers() {
 	//This should be changed to AWS IPs when implemented beyond local machine
-	clientsPorts = [4]string{"3.87.90.137:8030", "54.196.166.51:8030", "54.90.104.152:8030", "3.91.255.247:8030"}
+	//clientsPorts = [4]string{"3.87.90.137:8030", "54.196.166.51:8030", "54.90.104.152:8030", "3.91.255.247:8030"}
+	clientsPorts = [4]string{"127.0.0.1:8031", "127.0.0.1:8032", "127.0.0.1:8033", "127.0.0.1:8034"}
 	var clientsConnections [4]*rpc.Client
 
 	//Initialize our clients

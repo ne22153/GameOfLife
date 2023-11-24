@@ -113,7 +113,7 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int) [][]byte {
 	j := HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum)
 	if j != 0 {
-		
+
 	}
 	//For some reason the response differs from within the call and out of the call
 	//The difference seems to be random every call, so perhaps issues with response access?
@@ -176,6 +176,7 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 	if namedFunctionHandlerError != nil {
 		client := HandleCreateClientAndError(clientsPorts[clientNum])
 		Clients[clientNum] = client
+		response.Resend = true
 		return 1
 	}
 	return 0
