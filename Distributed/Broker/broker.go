@@ -202,6 +202,7 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
 		i := i
+		request.Paused = !getPaused()
 		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i, response) }()
 	}
 	changePaused()
