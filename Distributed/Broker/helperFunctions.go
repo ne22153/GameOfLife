@@ -19,7 +19,8 @@ func createRequestResponsePair(p Shared.Params, events chan<- Shared.Event) (Sha
 		CurrentTurn: make(chan int, 1),
 		CallAlive:   make(chan int, 1),
 		GetAlive:    make(chan int, 1),
-		GetTurn:     make(chan int, 1)}
+		GetTurn:     make(chan int, 1),
+		Paused:      !getPaused()}
 	//There doesn't exist a response, but we will create a new one
 	response := new(Shared.Response)
 
@@ -110,11 +111,9 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 	return strip
 }
 
-func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int) [][]byte {
-	j := HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum)
-	if j != 0 {
+func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int, brokerRes *Shared.Response) [][]byte {
+	HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
 
-	}
 	//For some reason the response differs from within the call and out of the call
 	//The difference seems to be random every call, so perhaps issues with response access?
 
@@ -128,12 +127,12 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 //Creates a strip for the worker and then the worker will perform GoL algorithm on such strip
 func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, stripSize int, imageWidth,
 	imageHeight,
-	workerNumber int, waitGroup *sync.WaitGroup, req Shared.Request, res *Shared.Response) {
+	workerNumber int, waitGroup *sync.WaitGroup, req Shared.Request, res *Shared.Response, brokerRes *Shared.Response) {
 	req.World = createStrip(inputWorld, stripSize,
 		workerNumber, imageHeight)
 	req.Parameters.ImageHeight = (stripSize) + BUFFER
 	workerChannelList[workerNumber] <- manager(req, res,
-		workerChannelList[workerNumber], workerNumber)
+		workerChannelList[workerNumber], workerNumber, brokerRes)
 	defer (*waitGroup).Done()
 }
 
@@ -164,20 +163,29 @@ func HandleCreateClientAndError(serverPort string) *rpc.Client {
 
 	if dialError != nil {
 		time.Sleep(1 * time.Second)
-		HandleCreateClientAndError(serverPort)
+		client = HandleCreateClientAndError(serverPort)
 	}
-
+	fmt.Println("Cliente: ", client)
 	return client
 }
 
 func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
-	request *Shared.Request, response *Shared.Response, clientNum int) int {
+	request *Shared.Request, response *Shared.Response, clientNum int, brokerRes *Shared.Response) int {
 	var namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
 	if namedFunctionHandlerError != nil {
+		for i := 0; i < WORKERS; i++ {
+			if i != clientNum {
+				request.Paused = true
+				HandleCallAndError(Clients[i], Shared.PauseHandler, request, response, clientNum, brokerRes)
+			}
+		}
 		client := HandleCreateClientAndError(clientsPorts[clientNum])
+		fmt.Println("client being weird? :", client)
 		Clients[clientNum] = client
-		response.Resend = true
+		brokerRes.Resend = true
 		return 1
+	} else {
+		brokerRes.Resend = false
 	}
 	return 0
 }

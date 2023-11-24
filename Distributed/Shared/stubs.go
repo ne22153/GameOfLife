@@ -44,6 +44,7 @@ type Request struct {
 	GetTurn      chan int
 	OldWorld     [][]byte
 	Turn         int
+	Paused       bool
 }
 
 func HandleError(err error) {

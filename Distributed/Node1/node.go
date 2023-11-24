@@ -65,6 +65,7 @@ func GoLWorker(inputWorld [][]byte, p Shared.Params) [][]byte {
 	//turn <- i + 1
 	changeCurrentWorld(inputWorld)
 
+	fmt.Println("Pausing")
 	paused.lock.Lock()
 	paused.lock.Unlock()
 	//Once all turns have been processed, free the condition variable
@@ -117,11 +118,13 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 		res.World = currentWorld.world
 		currentWorld.lock.Unlock()
 	} else { */ //If the node is fresh and no previous GoL instance was running in the past
+	fmt.Println("Called")
 	condition.Add(1)
 	res.World = GoLWorker(req.World, req.Parameters)
 	if req.Parameters.ImageWidth == 16 && req.Parameters.Turns == 1 {
 		fmt.Println(res.World)
 	}
+	fmt.Println("Done")
 	return
 }
 
@@ -137,15 +140,15 @@ func (s *GoLOperations) KYS(*Shared.Request, *Shared.Response) (err error) {
 
 // PauseManager :Handler whenever the user presses "p"
 //If already paused then unpause, otherwise pause.
-func (s *GoLOperations) PauseManager(*Shared.Request, *Shared.Response) (err error) {
-	if paused.pause {
+func (s *GoLOperations) PauseManager(req *Shared.Request, res *Shared.Response) (err error) {
+	if !req.Paused && paused.pause {
 		fmt.Println("Unlocking")
 		paused.lock.Unlock()
-	} else {
+	} else if req.Paused {
 		fmt.Println("Locking")
 		paused.lock.Lock()
 	}
-	paused.pause = !paused.pause
+	paused.pause = req.Paused
 	fmt.Println(paused.pause)
 	return
 }

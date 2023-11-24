@@ -109,13 +109,15 @@ setback:
 	var waitGroup sync.WaitGroup
 	//fmt.Println("Pause: ", getPaused())
 	var turn int
-
+	fmt.Println(Clients)
 	if paused.pause {
 		fmt.Println("Continuing old")
 		paused.pause = !paused.pause
 		paused.lock.Unlock()
 		for i := 0; i < WORKERS; i++ {
-			j := HandleCallAndError(Clients[i], Shared.PauseHandler, &req, res, i)
+			req.Paused = false
+			j := HandleCallAndError(Clients[i], Shared.PauseHandler, &req, res, i, res)
+			fmt.Println("Didn't break here")
 			if j != 0 {
 				fmt.Println("going to the start ")
 				goto setback
@@ -135,7 +137,9 @@ setback:
 		workerChannelList[j] = workerChannel
 	}
 	stripSizeList = distributeSliceSizes(req.Parameters)
+	fmt.Println(getCurrentTurn())
 	for i := turn; i < req.Parameters.Turns; i++ {
+		fmt.Println("Entering for loop")
 		//We now do split the input world for each thread accordingly
 		for j := 0; j < WORKERS; j++ {
 			waitGroup.Add(1)
@@ -144,17 +148,20 @@ setback:
 			request.World = getCurrentWorld()
 			go executeWorker(request.World, workerChannelList,
 				stripSizeList[j], req.Parameters.ImageHeight, req.Parameters.ImageWidth, j,
-				&waitGroup, request, response)
+				&waitGroup, request, response, res)
 		}
 		waitGroup.Wait()
+		fmt.Println("Cleared waiting")
 		if !res.Resend {
 			var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
 			changeCurrentTurn(i + 1)
 			changeCurrentWorld(newWorld)
 		} else {
 			changePaused()
+			paused.lock.Lock()
 			goto setback //Jump back to the start if anything reconnects.
 		}
+		fmt.Println(getCurrentTurn())
 
 		//reportToController(req.Parameters, req.Events, getCurrentWorld(), newWorld)
 
@@ -182,7 +189,7 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 	for i := 0; i < WORKERS; i++ {
 		fmt.Println("Killing it", i)
 		i := i
-		go func() { HandleCallAndError(Clients[i], Shared.SuicideHandler, &request, response, i) }()
+		go func() { HandleCallAndError(Clients[i], Shared.SuicideHandler, &request, response, i, response) }()
 		fmt.Println("Killed it", i)
 	}
 	time.Sleep(1 * time.Second)
@@ -195,7 +202,7 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
 		i := i
-		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i) }()
+		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i, response) }()
 	}
 	changePaused()
 	fmt.Println()
@@ -208,7 +215,7 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
 		i := i
-		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i) }()
+		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i, response) }()
 	}
 	changePaused()
 	fmt.Println("Paused after kill: ", getPaused())
