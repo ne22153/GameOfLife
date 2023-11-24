@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"net/rpc"
+	"os"
 	"sync"
 	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
@@ -174,10 +175,12 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
 		fmt.Println("Killing it", i)
+		i := i
 		go func() { HandleCallAndError(Clients[i], Shared.SuicideHandler, &request, response, i) }()
 		fmt.Println("Killed it", i)
 	}
-	//defer os.Exit(0)
+	time.Sleep(1 * time.Second)
+	os.Exit(0)
 	return
 }
 
@@ -185,6 +188,7 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 //If already paused then unpause, otherwise pause.
 func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
+		i := i
 		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i) }()
 	}
 	changePaused()
@@ -197,6 +201,7 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 // This is a form of fault tolerance.
 func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
+		i := i
 		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i) }()
 	}
 	changePaused()
