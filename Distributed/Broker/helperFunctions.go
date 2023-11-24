@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
+	"uk.ac.bris.cs/gameoflife/util"
 )
 
 func createRequestResponsePair(p Shared.Params, events chan<- Shared.Event) (Shared.Request, *Shared.Response) {
@@ -188,4 +189,20 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 		brokerRes.Resend = false
 	}
 	return 0
+}
+
+func flipWorldCellsIteration(oldWorld, newWorld [][]byte, turn, imageHeight, imageWidth int) []util.Cell {
+	var flippedCells []util.Cell
+	fmt.Println("Entering")
+	for i := 0; i < imageHeight; i++ {
+		for j := 0; j < imageWidth; j++ {
+			//If the cell has changed since the last iteration, we need to send an event to say so
+			if oldWorld[i][j] != newWorld[i][j] {
+				fmt.Println("I changed")
+				flippedCells = append(flippedCells, util.Cell{X: i, Y: j})
+			}
+		}
+	}
+	fmt.Println("Returning")
+	return flippedCells
 }

@@ -2,6 +2,7 @@ package Shared
 
 import (
 	"log"
+	"uk.ac.bris.cs/gameoflife/util"
 )
 
 // Params provides the details of how to run the Game of Life and which image to load.
@@ -27,10 +28,11 @@ var BrokerBackground = "BrokerOperations.BackgroundManager"
 var ControllerHandler = "ControllerOperations.CellReporter"
 
 type Response struct {
-	World      [][]byte
-	AliveCells int
-	Turns      int
-	Resend     bool
+	World        [][]byte
+	AliveCells   int
+	Turns        int
+	Resend       bool
+	FlippedCells []util.Cell
 }
 
 type Request struct {

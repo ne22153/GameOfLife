@@ -177,8 +177,8 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 	currentWorld.lock.Lock()
 	res.World = currentWorld.world
 	res.AliveCells = getAliveCellsCount(currentWorld.world)
+	res.FlippedCells = flipWorldCellsIteration(req.World, currentWorld.world, getCurrentTurn(), req.Parameters.ImageHeight, req.Parameters.ImageWidth)
 	currentWorld.lock.Unlock()
-
 	res.Turns = getCurrentTurn()
 	return
 }

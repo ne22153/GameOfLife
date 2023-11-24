@@ -35,7 +35,7 @@ func (s *ControllerOperations) CellsReporter(req Shared.Request, res *Shared.Res
 			}
 		}
 	}
-	Channels.events <- Shared.TurnComplete{req.Turn}
+	Channels.events <- Shared.TurnComplete{CompletedTurns: req.Turn}
 	return
 }
 
@@ -48,6 +48,7 @@ func flipWorldCellsInitial(world [][]byte, imageHeight, imageWidth, turn int, c 
 			}
 		}
 	}
+	c.events <- Shared.TurnComplete{CompletedTurns: 0}
 }
 
 //Main logic where we control all of our AWS nodes. Also controls the ticker and keypress logic as well.
@@ -69,7 +70,6 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 
 	//We set up our broker
 	fmt.Println("Sending a call")
-	flipWorldCellsInitial(request.World, request.Parameters.ImageHeight, request.Parameters.ImageWidth, 0, channels)
 	//channels.events <- Shared.TurnComplete{}
 	Shared.HandleCallAndError(client, Shared.BrokerHandler, &request, response)
 	channels.events <- Shared.FinalTurnComplete{

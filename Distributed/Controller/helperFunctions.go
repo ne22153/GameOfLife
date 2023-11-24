@@ -15,15 +15,23 @@ import (
 func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels,
 	client *rpc.Client, request *Shared.Request, response *Shared.Response) {
 	c.events <- Shared.AliveCellsCount{CompletedTurns: 0, CellsCount: 0}
+	flipWorldCellsInitial(request.World, request.Parameters.ImageHeight, request.Parameters.ImageWidth, 0, c)
+
 	for {
 		select {
 		//When the ticker triggers,
 		//we send an RPC call to return the number of alive cells, and number of turns processed
 		case <-ticker.C:
+			fmt.Println("Sending the stuff")
+
 			Shared.HandleCallAndError(client, Shared.BrokerInfo, request, response)
 			c.events <- Shared.AliveCellsCount{
 				CompletedTurns: response.Turns,
 				CellsCount:     response.AliveCells}
+			for i := 0; i < len(response.FlippedCells); i++ {
+				c.events <- Shared.CellFlipped{CompletedTurns: response.Turns, Cell: response.FlippedCells[i]}
+			}
+			c.events <- Shared.TurnComplete{CompletedTurns: response.Turns}
 			//fmt.Println("On turn: ", response.Turns, ", Alive cells: ", response.AliveCells)
 		}
 	}
