@@ -109,7 +109,12 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 }
 
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int, brokerRes *Shared.Response) [][]byte {
-	HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
+
+	var errorValue int = HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
+	if errorValue != 0 {
+		fmt.Println("world:", res.World)
+	}
+
 	return res.World
 }
 
@@ -123,7 +128,10 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 	req.Parameters.ImageHeight = (stripSize) + BUFFER
 	workerChannelList[workerNumber] <- manager(req, res,
 		workerChannelList[workerNumber], workerNumber, brokerRes)
-	defer (*waitGroup).Done()
+	defer func() {
+		(*waitGroup).Done()
+		fmt.Println("Completed the goroutine")
+	}()
 }
 
 func getAliveCellsCount(inputWorld [][]byte) int {

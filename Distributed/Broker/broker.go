@@ -133,6 +133,7 @@ setback:
 			go executeWorker(request.World, workerChannelList,
 				stripSizeList[j], req.Parameters.ImageHeight, req.Parameters.ImageWidth, j,
 				&waitGroup, request, response, res)
+			fmt.Println("goroutine done bruh")
 		}
 		waitGroup.Wait()
 		if !res.Resend {
