@@ -112,11 +112,12 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 	Clients.lock.Lock()
 	Clients.owner = "manager"
 	var errorValue int = HandleCallAndError(Clients.clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
-	Clients.lock.Unlock()
 
 	if errorValue != 0 {
 		fmt.Println("world:", res.World)
 		brokerRes.Resend = true
+	} else {
+		Clients.lock.Unlock()
 	}
 
 	return res.World
@@ -180,6 +181,10 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 	request *Shared.Request, response *Shared.Response, clientNum int, brokerRes *Shared.Response) int {
 	var namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
 	if namedFunctionHandlerError != nil {
+		if Clients.owner != "Call and Error Inner" {
+			Clients.lock.Unlock()
+			//Clients.owner = "unlock check"
+		}
 		for i := 0; i < WORKERS; i++ {
 			if i != clientNum {
 				request.Paused = true
@@ -187,6 +192,7 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 				Clients.owner = "Call and Error Inner"
 				fmt.Println("Going in")
 				HandleCallAndError(Clients.clients[i], Shared.PauseHandler, request, response, clientNum, brokerRes)
+				fmt.Println("Done for ", i)
 				Clients.lock.Unlock()
 			}
 		}
