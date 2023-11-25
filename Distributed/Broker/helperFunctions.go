@@ -112,29 +112,20 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 	return strip
 }
 
-func getAliveCellsCount(inputWorld [][]byte) int {
-	aliveCells := 0
-
-	for _, row := range inputWorld {
-		for _, tile := range row {
-			if tile == LIVE {
-				aliveCells++
-			}
-		}
-	}
-
-	return aliveCells
-}
-
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int, brokerRes *Shared.Response) [][]byte {
 	var j int = HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
 
-	if j == 1 {
-		fmt.Println("We messed up in the manager - IDK Whtat to do fr fr")
-	}
 	//For some reason the response differs from within the call and out of the call
 	//The difference seems to be random every call, so perhaps issues with response access?
 
+	if j == 1 {
+		fmt.Println("We disconnected here in the manager in Broker/helperfunctions.go function: manager \n" +
+			"We want to reconnect but don't know what to do ")
+		fmt.Println("Current state of the world at worker: ", clientNum, "- ", res.World)
+
+		//res.World = req.World
+		//return req.World
+	}
 	if req.Parameters.ImageWidth == 16 && req.Parameters.Turns == 1 {
 		fmt.Println("\n", clientNum+1, res.World)
 	}
@@ -149,9 +140,25 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 	req.World = createStrip(inputWorld, stripSize,
 		workerNumber, imageHeight)
 	req.Parameters.ImageHeight = (stripSize) + BUFFER
+
+	fmt.Println(len(req.World))
 	workerChannelList[workerNumber] <- manager(req, res,
 		workerChannelList[workerNumber], workerNumber, brokerRes)
 	defer (*waitGroup).Done()
+}
+
+func getAliveCellsCount(inputWorld [][]byte) int {
+	aliveCells := 0
+
+	for _, row := range inputWorld {
+		for _, tile := range row {
+			if tile == LIVE {
+				aliveCells++
+			}
+		}
+	}
+
+	return aliveCells
 }
 
 func reportToController(p Shared.Params, events chan<- Shared.Event, oldWorld [][]byte, newWorld [][]byte) {

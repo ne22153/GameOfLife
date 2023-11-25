@@ -105,8 +105,8 @@ func (s *BrokerOperations) Hi(req Shared.Request, res *Shared.Response) (err err
 
 // GoLManager Breaks up the world and sends it to the workers
 func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) (err error) {
-setback:
 	var waitGroup sync.WaitGroup
+setback:
 	//fmt.Println("Pause: ", getPaused())
 	var turn int
 	fmt.Println(Clients)
