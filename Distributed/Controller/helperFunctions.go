@@ -34,7 +34,7 @@ func getPaused() bool {
 //Helper function of controller
 //Performs necessary logic in order to handle the ticker
 func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels,
-	client *rpc.Client, request *Shared.Request, response *Shared.Response) {
+	client *rpc.Client, request Shared.Request, response *Shared.Response) {
 	c.events <- Shared.AliveCellsCount{CompletedTurns: 0, CellsCount: 0}
 	flipWorldCellsInitial(request.World, request.Parameters.ImageHeight, request.Parameters.ImageWidth, 0, c)
 	currentWorld := request.World
@@ -44,7 +44,7 @@ func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels,
 		//we send an RPC call to return the number of alive cells, and number of turns processed
 		case <-ticker.C:
 			request.World = currentWorld
-			Shared.HandleCallAndError(client, Shared.BrokerInfo, request, response)
+			Shared.HandleCallAndError(client, Shared.BrokerInfo, &request, response)
 			c.events <- Shared.AliveCellsCount{
 				CompletedTurns: response.Turns,
 				CellsCount:     response.AliveCells}

@@ -46,7 +46,7 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	//Make a ticker for the updates
 	ticker := time.NewTicker(2 * time.Second)
 	//Set up the ticker and keypress processes
-	go aliveCellsReporter(ticker, channels, client, &request, response)
+	go aliveCellsReporter(ticker, channels, client, request, response)
 	go determineKeyPress(client, keyPresses, &request, response, ticker, channels)
 
 	//We set up our broker

@@ -113,6 +113,7 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 	var errorValue int = HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
 	if errorValue != 0 {
 		fmt.Println("world:", res.World)
+		brokerRes.Resend = true
 	}
 
 	return res.World

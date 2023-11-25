@@ -126,15 +126,20 @@ setback:
 	for i := turn; i < req.Parameters.Turns; i++ {
 		//We now do split the input world for each thread accordingly
 		for j := 0; j < WORKERS; j++ {
+			fmt.Println("hi")
 			waitGroup.Add(1)
+			fmt.Println("hii")
 			//We execute the workers concurrently
 			var request, response = createRequestResponsePair(req.Parameters, req.Events)
+			fmt.Println("Hi")
 			request.World = getCurrentWorld()
+			fmt.Println("Hii")
 			go executeWorker(request.World, workerChannelList,
 				stripSizeList[j], req.Parameters.ImageHeight, req.Parameters.ImageWidth, j,
 				&waitGroup, request, response, res)
 			fmt.Println("goroutine done bruh")
 		}
+		fmt.Println("Made it out, waiting")
 		waitGroup.Wait()
 		if !res.Resend {
 			var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
