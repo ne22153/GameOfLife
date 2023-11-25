@@ -5,10 +5,31 @@ import (
 	"net/rpc"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 	"uk.ac.bris.cs/gameoflife/util"
 )
+
+type pauseStruct struct {
+	pause bool
+	lock  sync.Mutex
+}
+
+var paused pauseStruct
+
+func changePaused() {
+	paused.lock.Lock()
+	paused.pause = !paused.pause
+	paused.lock.Unlock()
+}
+
+func getPaused() bool {
+	paused.lock.Lock()
+	var temp = paused.pause
+	paused.lock.Unlock()
+	return temp
+}
 
 //Helper function of controller
 //Performs necessary logic in order to handle the ticker
@@ -16,23 +37,24 @@ func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels,
 	client *rpc.Client, request *Shared.Request, response *Shared.Response) {
 	c.events <- Shared.AliveCellsCount{CompletedTurns: 0, CellsCount: 0}
 	flipWorldCellsInitial(request.World, request.Parameters.ImageHeight, request.Parameters.ImageWidth, 0, c)
-
+	currentWorld := request.World
 	for {
 		select {
 		//When the ticker triggers,
 		//we send an RPC call to return the number of alive cells, and number of turns processed
 		case <-ticker.C:
-			fmt.Println("Sending the stuff")
-
+			request.World = currentWorld
 			Shared.HandleCallAndError(client, Shared.BrokerInfo, request, response)
 			c.events <- Shared.AliveCellsCount{
 				CompletedTurns: response.Turns,
 				CellsCount:     response.AliveCells}
-			for i := 0; i < len(response.FlippedCells); i++ {
-				c.events <- Shared.CellFlipped{CompletedTurns: response.Turns, Cell: response.FlippedCells[i]}
+			if !getPaused() {
+				for i := 0; i < len(response.FlippedCells); i++ {
+					c.events <- Shared.CellFlipped{CompletedTurns: response.Turns, Cell: response.FlippedCells[i]}
+				}
+				c.events <- Shared.TurnComplete{CompletedTurns: response.Turns}
+				currentWorld = response.World
 			}
-			c.events <- Shared.TurnComplete{CompletedTurns: response.Turns}
-			//fmt.Println("On turn: ", response.Turns, ", Alive cells: ", response.AliveCells)
 		}
 	}
 }
@@ -57,13 +79,9 @@ func createRequestResponsePair(p Shared.Params, c DistributorChannels) (Shared.R
 
 	//Forms the request which contains the [][]byte version of the PGM file
 	request := Shared.Request{
-		World:       WriteFromFileIO(p.ImageHeight, p.ImageWidth, c),
-		Parameters:  p,
-		Events:      c.events,
-		CurrentTurn: make(chan int, 1),
-		CallAlive:   make(chan int, 1),
-		GetAlive:    make(chan int, 1),
-		GetTurn:     make(chan int, 1)}
+		World:      WriteFromFileIO(p.ImageHeight, p.ImageWidth, c),
+		Parameters: p,
+		Events:     c.events}
 	//There doesn't exist a response, but we will create a new one
 	response := new(Shared.Response)
 
@@ -96,7 +114,7 @@ func handleGameShutDown(client *rpc.Client, response *Shared.Response,
 	writeToFileIO(response.World, p, filename, c)
 	shutDownIOTickerClient(c, ticker, client)
 	close(c.events)
-	os.Exit(0)
+	//os.Exit(0)
 }
 
 //Helper function of controller
@@ -122,6 +140,7 @@ func determineKeyPress(client *rpc.Client, keyPresses <-chan rune,
 			} else if key == 'p' {
 				fmt.Println("Continuing")
 				Shared.HandleCallAndError(client, Shared.BrokerPause, req, res)
+				changePaused()
 			} else if key == 'q' {
 				Shared.HandleCallAndError(client, Shared.BrokerBackground, req, res)
 				Shared.HandleCallAndError(client, Shared.BrokerInfo, req, res)

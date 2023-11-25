@@ -24,26 +24,10 @@ type DistributorChannels struct {
 	ioInput    <-chan byte
 }
 
-type ControllerOperations struct{}
-
-func (s *ControllerOperations) CellsReporter(req Shared.Request, res *Shared.Response) (err error) {
-	for i := 0; i < req.Parameters.ImageHeight; i++ {
-		for j := 0; j < req.Parameters.ImageWidth; j++ {
-			//If the cell has changed since the last iteration, we need to send an event to say so
-			if req.OldWorld[i][j] != req.World[i][j] {
-				Channels.events <- Shared.CellFlipped{CompletedTurns: req.Turn, Cell: util.Cell{X: j, Y: i}}
-			}
-		}
-	}
-	Channels.events <- Shared.TurnComplete{CompletedTurns: req.Turn}
-	return
-}
-
 func flipWorldCellsInitial(world [][]byte, imageHeight, imageWidth, turn int, c DistributorChannels) {
 	for i := 0; i < imageHeight; i++ {
 		for j := 0; j < imageWidth; j++ {
 			if world[i][j] == LIVE {
-				//fmt.Println("Cell flipped")
 				c.events <- Shared.CellFlipped{CompletedTurns: turn, Cell: util.Cell{X: j, Y: i}}
 			}
 		}
@@ -53,14 +37,11 @@ func flipWorldCellsInitial(world [][]byte, imageHeight, imageWidth, turn int, c 
 
 //Main logic where we control all of our AWS nodes. Also controls the ticker and keypress logic as well.
 func controller(params Shared.Params, channels DistributorChannels, keyPresses <-chan rune) {
-	fmt.Println("Server port: ", params.ServerPort)
 	var client = Shared.HandleCreateClientAndError(params.ServerPort)
-	fmt.Println(client)
 	Channels = channels
 
 	//Create request response pair
 	request, response := createRequestResponsePair(params, channels)
-	fmt.Println("Actual address: ", &request.CallAlive)
 
 	//Make a ticker for the updates
 	ticker := time.NewTicker(2 * time.Second)
@@ -69,13 +50,10 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	go determineKeyPress(client, keyPresses, &request, response, ticker, channels)
 
 	//We set up our broker
-	fmt.Println("Sending a call")
-	//channels.events <- Shared.TurnComplete{}
 	Shared.HandleCallAndError(client, Shared.BrokerHandler, &request, response)
 	channels.events <- Shared.FinalTurnComplete{
 		CompletedTurns: params.Turns,
 		Alive:          calculateAliveCells(response.World)}
-	fmt.Println("Shutting down")
 	//Shut down the game safely
 	defer handleGameShutDown(client, response, params, channels, ticker)
 }
@@ -122,14 +100,6 @@ func main() {
 
 	keyPresses := make(chan rune, 10)
 	events := make(chan Shared.Event, 1000)
-
-	/*listener, _ := net.Listen("tcp", ":8035")
-	defer func(listener net.Listener) {
-		err := listener.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(listener)*/
 
 	go Run(params, events, keyPresses)
 	SharedSDL.Run(params, events, keyPresses)

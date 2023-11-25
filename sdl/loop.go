@@ -20,7 +20,6 @@ sdlLoop:
 					//When p is pressed, pause the processing and print the current turn that is being processed
 					//If p is pressed again resume the processing
 					keyPresses <- 'p'
-					fmt.Println("P pressed")
 				case sdl.K_s:
 					//When s is pressed, we need to generate a PGM file with the current state of the board
 					keyPresses <- 's'

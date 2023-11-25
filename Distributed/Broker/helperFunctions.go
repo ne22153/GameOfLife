@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math"
 	"net/rpc"
 	"sync"
@@ -14,14 +13,10 @@ func createRequestResponsePair(p Shared.Params, events chan<- Shared.Event) (Sha
 
 	//Forms the request which contains the [][]byte version of the PGM file
 	request := Shared.Request{
-		World:       getCurrentWorld(),
-		Parameters:  p,
-		Events:      events,
-		CurrentTurn: make(chan int, 1),
-		CallAlive:   make(chan int, 1),
-		GetAlive:    make(chan int, 1),
-		GetTurn:     make(chan int, 1),
-		Paused:      !getPaused()}
+		World:      getCurrentWorld(),
+		Parameters: p,
+		Events:     events,
+		Paused:     !getPaused()}
 	//There doesn't exist a response, but we will create a new one
 	response := new(Shared.Response)
 
@@ -114,13 +109,6 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int, brokerRes *Shared.Response) [][]byte {
 	HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
-
-	//For some reason the response differs from within the call and out of the call
-	//The difference seems to be random every call, so perhaps issues with response access?
-
-	if req.Parameters.ImageWidth == 16 && req.Parameters.Turns == 1 {
-		fmt.Println("\n", clientNum+1, res.World)
-	}
 	return res.World
 }
 
@@ -151,14 +139,6 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 	return aliveCells
 }
 
-func reportToController(p Shared.Params, events chan<- Shared.Event, oldWorld [][]byte, newWorld [][]byte) {
-	request, response := createRequestResponsePair(p, events)
-	request.OldWorld = oldWorld
-	request.World = newWorld
-	request.Turn = getCurrentTurn()
-	Shared.HandleCallAndError(controller, Shared.ControllerHandler, &request, response)
-}
-
 func HandleCreateClientAndError(serverPort string) *rpc.Client {
 	client, dialError := rpc.Dial("tcp", serverPort)
 
@@ -166,7 +146,7 @@ func HandleCreateClientAndError(serverPort string) *rpc.Client {
 		time.Sleep(1 * time.Second)
 		client = HandleCreateClientAndError(serverPort)
 	}
-	fmt.Println("Cliente: ", client)
+
 	return client
 }
 
@@ -181,7 +161,6 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 			}
 		}
 		client := HandleCreateClientAndError(clientsPorts[clientNum])
-		fmt.Println("client being weird? :", client)
 		Clients[clientNum] = client
 		brokerRes.Resend = true
 		return 1
@@ -191,18 +170,21 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 	return 0
 }
 
-func flipWorldCellsIteration(oldWorld, newWorld [][]byte, turn, imageHeight, imageWidth int) []util.Cell {
+func flipWorldCellsIteration(oldWorld, newWorld [][]byte, imageHeight, imageWidth int) []util.Cell {
 	var flippedCells []util.Cell
-	fmt.Println("Entering")
 	for i := 0; i < imageHeight; i++ {
 		for j := 0; j < imageWidth; j++ {
 			//If the cell has changed since the last iteration, we need to send an event to say so
-			if oldWorld[i][j] != newWorld[i][j] {
-				fmt.Println("I changed")
+			/*if oldWorld[i][j] != newWorld[i][j] {
+				flippedCells = append(flippedCells, util.Cell{X: i, Y: j})
+			}*/
+			if oldWorld[i][j] == LIVE {
+				flippedCells = append(flippedCells, util.Cell{X: i, Y: j})
+			}
+			if newWorld[i][j] == LIVE {
 				flippedCells = append(flippedCells, util.Cell{X: i, Y: j})
 			}
 		}
 	}
-	fmt.Println("Returning")
 	return flippedCells
 }

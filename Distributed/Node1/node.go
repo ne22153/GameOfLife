@@ -17,11 +17,6 @@ type currentWorldStruct struct {
 	lock  sync.Mutex
 }
 
-type currentTurnStruct struct {
-	turn int
-	lock sync.Mutex
-}
-
 type pausedStruct struct {
 	pause bool
 	lock  sync.Mutex
@@ -29,7 +24,6 @@ type pausedStruct struct {
 
 //Globals we made for general management of mutexes and variables
 var currentWorld currentWorldStruct
-var currentTurn currentTurnStruct
 var paused pausedStruct
 var condition sync.WaitGroup
 
@@ -41,31 +35,17 @@ func changeCurrentWorld(input [][]byte) {
 	currentWorld.lock.Unlock()
 }
 
-//General helper function for the global variables
-//Locks current turn's lock, changes the turn value to the input, then Unlocks it
-/*func changeCurrentTurn(input int) {
-	currentTurn.lock.Lock()
-	currentTurn.turn = input
-	currentTurn.lock.Unlock()
-}*/
-
 // GoLWorker does the actual working stuff
 func GoLWorker(inputWorld [][]byte, p Shared.Params) [][]byte {
 	var newWorld [][]byte
 	if p.Turns == 0 {
-		if p.ImageHeight == 16 {
-			fmt.Println("Auto done: ", inputWorld)
-		}
 		return inputWorld
 	}
-	//fmt.Println("Height : ", p.ImageHeight, " Width : ", p.ImageWidth)
+
 	newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
-	//currentWorld <- newWorld
 	inputWorld = newWorld
-	//turn <- i + 1
 	changeCurrentWorld(inputWorld)
 
-	fmt.Println("Pausing")
 	paused.lock.Lock()
 	paused.lock.Unlock()
 	//Once all turns have been processed, free the condition variable
@@ -73,58 +53,13 @@ func GoLWorker(inputWorld [][]byte, p Shared.Params) [][]byte {
 	return inputWorld
 }
 
-func getAliveCellsCount(inputWorld [][]byte) int {
-	aliveCells := 0
-
-	for _, row := range inputWorld {
-		for _, tile := range row {
-			if tile == LIVE {
-				aliveCells++
-			}
-		}
-	}
-
-	return aliveCells
-}
-
 // GoLOperations :Handles GoL operations and all of its methods
 type GoLOperations struct{}
 
-// TickerManager :Handler for the ticker. Extracts the alive cells count and the turns of the current running state
-//into the response.
-/*func (s *GoLOperations) TickerManager(req Shared.Request, res *Shared.Response) (err error) {
-	currentWorld.lock.Lock()
-	res.World = currentWorld.world
-	res.AliveCells = getAliveCellsCount(currentWorld.world)
-	currentWorld.lock.Unlock()
-
-	currentTurn.lock.Lock()
-	res.Turns = currentTurn.turn
-	currentTurn.lock.Unlock()
-	return
-}*/
-
 // GoLManager :Handler for the actual GoL algorithm
 func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (err error) {
-	//There already existed a GoL instance running (due to keypress Q, do this)
-	/*if paused.pause {
-		//Restarts the GoL instance running
-		//fmt.Println("continuing old")
-		paused.pause = !paused.pause
-		paused.lock.Unlock()
-
-		condition.Wait()
-		currentWorld.lock.Lock()
-		res.World = currentWorld.world
-		currentWorld.lock.Unlock()
-	} else { */ //If the node is fresh and no previous GoL instance was running in the past
-	fmt.Println("Called")
 	condition.Add(1)
 	res.World = GoLWorker(req.World, req.Parameters)
-	if req.Parameters.ImageWidth == 16 && req.Parameters.Turns == 1 {
-		fmt.Println(res.World)
-	}
-	fmt.Println("Done")
 	return
 }
 
@@ -149,7 +84,6 @@ func (s *GoLOperations) PauseManager(req *Shared.Request, res *Shared.Response) 
 		paused.lock.Lock()
 	}
 	paused.pause = req.Paused
-	fmt.Println(paused.pause)
 	return
 }
 
@@ -164,9 +98,7 @@ func (s *GoLOperations) BackgroundManager(*Shared.Request, *Shared.Response) (er
 }
 
 func main() {
-	fmt.Println("hi")
 	pAddr := flag.String("port", "8031", "Port to listen on")
-	fmt.Println(*pAddr)
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 	Shared.HandleRegisterAndError(&GoLOperations{})

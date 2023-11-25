@@ -42,8 +42,6 @@ var workerChannelList = make([]chan [][]byte, WORKERS)
 
 var stripSizeList []int
 
-var controller *rpc.Client
-
 var clientsPorts [4]string
 
 //------------------CONSTANTS-------------------------
@@ -98,48 +96,34 @@ type BrokerOperations struct{}
 
 //------------------INCOMING RPC CALLS-------------------------
 
-func (s *BrokerOperations) Hi(req Shared.Request, res *Shared.Response) (err error) {
-	fmt.Println("Hi")
-	return
-}
-
 // GoLManager Breaks up the world and sends it to the workers
 func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) (err error) {
 setback:
 	var waitGroup sync.WaitGroup
-	//fmt.Println("Pause: ", getPaused())
 	var turn int
-	fmt.Println(Clients)
 	if paused.pause {
-		fmt.Println("Continuing old")
 		paused.pause = !paused.pause
 		paused.lock.Unlock()
 		for i := 0; i < WORKERS; i++ {
 			req.Paused = false
 			j := HandleCallAndError(Clients[i], Shared.PauseHandler, &req, res, i, res)
-			fmt.Println("Didn't break here")
 			if j != 0 {
-				fmt.Println("going to the start ")
 				goto setback
 			}
 		}
 
 		turn = getCurrentTurn()
 	} else {
-		fmt.Println("I ain't paused yet")
 		turn = 0
 		changeCurrentWorld(req.World)
 	}
-	//waitGroup.Wait()
-	//prevWaitGroup = waitGroup
+
 	for j := 0; j < WORKERS; j++ {
 		var workerChannel = make(chan [][]byte, 2)
 		workerChannelList[j] = workerChannel
 	}
 	stripSizeList = distributeSliceSizes(req.Parameters)
-	fmt.Println(getCurrentTurn())
 	for i := turn; i < req.Parameters.Turns; i++ {
-		fmt.Println("Entering for loop")
 		//We now do split the input world for each thread accordingly
 		for j := 0; j < WORKERS; j++ {
 			waitGroup.Add(1)
@@ -151,7 +135,6 @@ setback:
 				&waitGroup, request, response, res)
 		}
 		waitGroup.Wait()
-		fmt.Println("Cleared waiting")
 		if !res.Resend {
 			var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
 			changeCurrentTurn(i + 1)
@@ -161,7 +144,6 @@ setback:
 			paused.lock.Lock()
 			goto setback //Jump back to the start if anything reconnects.
 		}
-		fmt.Println(getCurrentTurn())
 
 		//reportToController(req.Parameters, req.Events, getCurrentWorld(), newWorld)
 
@@ -169,15 +151,17 @@ setback:
 		paused.lock.Unlock()
 	}
 	res.World = getCurrentWorld()
-	fmt.Println("Returning info")
 	return
 }
 
 func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) (err error) {
 	currentWorld.lock.Lock()
+
 	res.World = currentWorld.world
 	res.AliveCells = getAliveCellsCount(currentWorld.world)
-	res.FlippedCells = flipWorldCellsIteration(req.World, currentWorld.world, getCurrentTurn(), req.Parameters.ImageHeight, req.Parameters.ImageWidth)
+	res.FlippedCells = flipWorldCellsIteration(req.World, currentWorld.world, req.Parameters.ImageHeight, req.Parameters.ImageWidth)
+	res.Turns = getCurrentTurn()
+
 	currentWorld.lock.Unlock()
 	res.Turns = getCurrentTurn()
 	return
@@ -187,10 +171,8 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 //Called from the local controller to tell the AWS node to kill itself
 func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
-		fmt.Println("Killing it", i)
 		i := i
 		go func() { HandleCallAndError(Clients[i], Shared.SuicideHandler, &request, response, i, response) }()
-		fmt.Println("Killed it", i)
 	}
 	time.Sleep(1 * time.Second)
 	os.Exit(0)
@@ -206,7 +188,6 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i, response) }()
 	}
 	changePaused()
-	fmt.Println()
 	return
 }
 
@@ -219,7 +200,6 @@ func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *S
 		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i, response) }()
 	}
 	changePaused()
-	fmt.Println("Paused after kill: ", getPaused())
 	paused.lock.Lock()
 	return
 }
