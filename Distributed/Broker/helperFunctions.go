@@ -109,8 +109,9 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 }
 
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int, brokerRes *Shared.Response) [][]byte {
-
-	var errorValue int = HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
+	Clients.lock.Lock()
+	var errorValue int = HandleCallAndError(Clients.clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
+	Clients.lock.Unlock()
 	if errorValue != 0 {
 		fmt.Println("world:", res.World)
 		brokerRes.Resend = true
@@ -131,7 +132,7 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 		workerChannelList[workerNumber], workerNumber, brokerRes)
 	defer func() {
 		(*waitGroup).Done()
-		fmt.Println("Completed the goroutine")
+		//fmt.Println("Completed the goroutine")
 	}()
 }
 
@@ -180,11 +181,15 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 		for i := 0; i < WORKERS; i++ {
 			if i != clientNum {
 				request.Paused = true
-				HandleCallAndError(Clients[i], Shared.PauseHandler, request, response, clientNum, brokerRes)
+				Clients.lock.Lock()
+				HandleCallAndError(Clients.clients[i], Shared.PauseHandler, request, response, clientNum, brokerRes)
+				Clients.lock.Unlock()
 			}
 		}
 		client := HandleCreateClientAndError(clientsPorts[clientNum])
-		Clients[clientNum] = client
+		Clients.lock.Lock()
+		Clients.clients[clientNum] = client
+		Clients.lock.Unlock()
 		brokerRes.Resend = true
 		return 1
 	} else {

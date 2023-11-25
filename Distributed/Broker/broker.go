@@ -14,8 +14,12 @@ import (
 )
 
 //------------------GLOBAL VARIABLES AND APPLICABLE STRUCTS-------------------------
+type clientStruct struct {
+	clients [4]*rpc.Client
+	lock    sync.Mutex
+}
 
-var Clients [4]*rpc.Client
+var Clients clientStruct
 
 type currentTurnStruct struct {
 	turn int
@@ -106,7 +110,9 @@ setback:
 		paused.lock.Unlock()
 		for i := 0; i < WORKERS; i++ {
 			req.Paused = false
-			j := HandleCallAndError(Clients[i], Shared.PauseHandler, &req, res, i, res)
+			Clients.lock.Lock()
+			j := HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &req, res, i, res)
+			Clients.lock.Unlock()
 			if j != 0 {
 				goto setback
 			}
@@ -126,20 +132,20 @@ setback:
 	for i := turn; i < req.Parameters.Turns; i++ {
 		//We now do split the input world for each thread accordingly
 		for j := 0; j < WORKERS; j++ {
-			fmt.Println("hi")
+			//fmt.Println("hi")
 			waitGroup.Add(1)
-			fmt.Println("hii")
+			//fmt.Println("hii")
 			//We execute the workers concurrently
 			var request, response = createRequestResponsePair(req.Parameters, req.Events)
-			fmt.Println("Hi")
+			//fmt.Println("Hi")
 			request.World = getCurrentWorld()
-			fmt.Println("Hii")
+			//fmt.Println("Hii")
 			go executeWorker(request.World, workerChannelList,
 				stripSizeList[j], req.Parameters.ImageHeight, req.Parameters.ImageWidth, j,
 				&waitGroup, request, response, res)
-			fmt.Println("goroutine done bruh")
+			//fmt.Println("goroutine done bruh")
 		}
-		fmt.Println("Made it out, waiting")
+		//fmt.Println("Made it out, waiting")
 		waitGroup.Wait()
 		if !res.Resend {
 			var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
@@ -178,7 +184,9 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
 		i := i
-		go func() { HandleCallAndError(Clients[i], Shared.SuicideHandler, &request, response, i, response) }()
+		Clients.lock.Lock()
+		go func() { HandleCallAndError(Clients.clients[i], Shared.SuicideHandler, &request, response, i, response) }()
+		Clients.lock.Unlock()
 	}
 	time.Sleep(1 * time.Second)
 	os.Exit(0)
@@ -191,7 +199,9 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 	for i := 0; i < WORKERS; i++ {
 		i := i
 		request.Paused = !getPaused()
-		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i, response) }()
+		Clients.lock.Lock()
+		go func() { HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &request, response, i, response) }()
+		Clients.lock.Unlock()
 	}
 	changePaused()
 	return
@@ -203,7 +213,9 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *Shared.Response) (err error) {
 	for i := 0; i < WORKERS; i++ {
 		i := i
-		go func() { HandleCallAndError(Clients[i], Shared.PauseHandler, &request, response, i, response) }()
+		Clients.lock.Lock()
+		go func() { HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &request, response, i, response) }()
+		Clients.lock.Unlock()
 	}
 	changePaused()
 	paused.lock.Lock()
@@ -225,8 +237,9 @@ func connectToWorkers() {
 		fmt.Println("Attempting to connect to : ", clientsPorts[i])
 		clientsConnections[i] = Shared.HandleCreateClientAndError(clientsPorts[i])
 	}
-
-	Clients = clientsConnections
+	Clients.lock.Lock()
+	Clients.clients = clientsConnections
+	Clients.lock.Unlock()
 }
 
 //Main sets up a listener to listen for controller
