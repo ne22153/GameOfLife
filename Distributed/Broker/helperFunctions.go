@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"net/rpc"
 	"sync"
@@ -142,10 +143,23 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 func HandleCreateClientAndError(serverPort string) *rpc.Client {
 	client, dialError := rpc.Dial("tcp", serverPort)
 
-	if dialError != nil {
-		time.Sleep(1 * time.Second)
-		client = HandleCreateClientAndError(serverPort)
+	//Busy wait every 500ms
+	for {
+		if dialError != nil {
+			time.Sleep(500 * time.Millisecond)
+			client, dialError = rpc.Dial("tcp", serverPort)
+			fmt.Println("Bryuh")
+		} else {
+			//If there is no error, we can break out
+			break
+		}
+
 	}
+
+	//if dialError != nil {
+	//	time.Sleep(1 * time.Second)
+	//	client = HandleCreateClientAndError(serverPort)
+	//}
 
 	return client
 }
