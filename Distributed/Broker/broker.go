@@ -113,6 +113,7 @@ setback:
 			req.Paused = false
 			Clients.lock.Lock()
 			Clients.owner = "Broker manager"
+			fmt.Println("CLAIMED by", Clients.owner)
 			j := HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &req, res, i, res)
 			Clients.lock.Unlock()
 			if j != 0 {
@@ -142,13 +143,19 @@ setback:
 			//fmt.Println("Hi")
 			request.World = getCurrentWorld()
 			//fmt.Println("Hii")
-			go executeWorker(request.World, workerChannelList,
+			executeWorker(request.World, workerChannelList,
 				stripSizeList[j], req.Parameters.ImageHeight, req.Parameters.ImageWidth, j,
 				&waitGroup, request, response, res)
-			//fmt.Println("goroutine done bruh")
+			fmt.Println("goroutine done bruh")
+			if res.Resend {
+				changePaused()
+				paused.lock.Lock()
+				goto setback
+			}
 		}
-		//fmt.Println("Made it out, waiting")
+		fmt.Println("Made it out, waiting")
 		waitGroup.Wait()
+		fmt.Println("Cont")
 		if !res.Resend {
 			var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
 			changeCurrentTurn(i + 1)
@@ -188,6 +195,7 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 		i := i
 		Clients.lock.Lock()
 		Clients.owner = "KYS"
+		fmt.Println("CLAIMED by", Clients.owner)
 		go func() { HandleCallAndError(Clients.clients[i], Shared.SuicideHandler, &request, response, i, response) }()
 		Clients.lock.Unlock()
 	}
@@ -204,6 +212,7 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 		request.Paused = !getPaused()
 		Clients.lock.Lock()
 		Clients.owner = "Broker Pause"
+		fmt.Println("CLAIMED by", Clients.owner)
 		go func() { HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &request, response, i, response) }()
 		Clients.lock.Unlock()
 	}
@@ -219,6 +228,7 @@ func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *S
 		i := i
 		Clients.lock.Lock()
 		Clients.owner = "Broker Background"
+		fmt.Println("CLAIMED by", Clients.owner)
 		go func() { HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &request, response, i, response) }()
 		Clients.lock.Unlock()
 	}
@@ -244,6 +254,7 @@ func connectToWorkers() {
 	}
 	Clients.lock.Lock()
 	Clients.owner = "Setup"
+	fmt.Println("CLAIMED by", Clients.owner)
 	Clients.clients = clientsConnections
 	Clients.lock.Unlock()
 }

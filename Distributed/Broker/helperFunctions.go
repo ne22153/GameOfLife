@@ -110,14 +110,17 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int, brokerRes *Shared.Response) [][]byte {
 	Clients.lock.Lock()
-	Clients.owner = "manager"
-	var errorValue int = HandleCallAndError(Clients.clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
+	temp := Clients.clients[clientNum]
+	Clients.lock.Unlock()
+	/*Clients.owner = "manager"
+	fmt.Println("CLAIMED by", Clients.owner, clientNum+1)*/
+	var errorValue int = HandleCallAndError(temp, Shared.GoLHandler, &req, res, clientNum, brokerRes)
 
 	if errorValue != 0 {
 		fmt.Println("world:", res.World)
-		brokerRes.Resend = true
+		//brokerRes.Resend = true
 	} else {
-		Clients.lock.Unlock()
+		fmt.Println("Released by manager ", clientNum+1)
 	}
 
 	return res.World
@@ -135,7 +138,7 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 		workerChannelList[workerNumber], workerNumber, brokerRes)
 	defer func() {
 		(*waitGroup).Done()
-		//fmt.Println("Completed the goroutine")
+		fmt.Println("Completed the goroutine")
 	}()
 }
 
@@ -179,32 +182,47 @@ func HandleCreateClientAndError(serverPort string) *rpc.Client {
 
 func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 	request *Shared.Request, response *Shared.Response, clientNum int, brokerRes *Shared.Response) int {
+	if namedFunctionHandler == Shared.GoLHandler {
+		fmt.Println("Sending to worker ", clientNum+1)
+	}
 	var namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
 	if namedFunctionHandlerError != nil {
-		if Clients.owner != "Call and Error Inner" {
-			Clients.lock.Unlock()
-			//Clients.owner = "unlock check"
-		}
+		fmt.Println(namedFunctionHandlerError)
 		for i := 0; i < WORKERS; i++ {
 			if i != clientNum {
+				/*if namedFunctionHandler == Shared.GoLHandler {
+					Clients.lock.Unlock()
+					fmt.Println("Released by handler")
+					namedFunctionHandler = "errorHandler"
+				}*/
+				fmt.Println("Entering ", i+1)
 				request.Paused = true
 				Clients.lock.Lock()
 				Clients.owner = "Call and Error Inner"
+				fmt.Println("CLAIMED by", Clients.owner)
 				fmt.Println("Going in")
 				HandleCallAndError(Clients.clients[i], Shared.PauseHandler, request, response, clientNum, brokerRes)
-				fmt.Println("Done for ", i)
+				fmt.Println("Done for ", i+1)
 				Clients.lock.Unlock()
 			}
 		}
+		fmt.Println("Aha")
 		client := HandleCreateClientAndError(clientsPorts[clientNum])
+		fmt.Println("waiting for the owner")
+		/*if Clients.owner == "manager" {
+			Clients.lock.Unlock()
+			Clients.owner = "unlock check"
+		}*/
 		Clients.lock.Lock()
 		Clients.owner = "Call and Error outer"
+		fmt.Println("CLAIMED by", Clients.owner)
 		Clients.clients[clientNum] = client
 		Clients.lock.Unlock()
 		brokerRes.Resend = true
 		return 1
 	} else {
 		brokerRes.Resend = false
+		fmt.Println("Finishing worker ", clientNum+1)
 	}
 	return 0
 }

@@ -60,6 +60,7 @@ type GoLOperations struct{}
 func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (err error) {
 	condition.Add(1)
 	res.World = GoLWorker(req.World, req.Parameters)
+	fmt.Println("returning")
 	return
 }
 
