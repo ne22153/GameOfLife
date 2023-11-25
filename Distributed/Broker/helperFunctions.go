@@ -113,6 +113,9 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 }
 
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int, brokerRes *Shared.Response) [][]byte {
+	var resendFlag bool = false
+
+reconnect:
 	var j int = HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
 
 	//For some reason the response differs from within the call and out of the call
@@ -122,9 +125,14 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 		fmt.Println("We disconnected here in the manager in Broker/helperfunctions.go function: manager \n" +
 			"We want to reconnect but don't know what to do ")
 		fmt.Println("Current state of the world at worker: ", clientNum, "- ", res.World)
+		resendFlag = true
 
-		//res.World = req.World
-		//return req.World
+		goto reconnect
+	}
+
+	if resendFlag {
+		fmt.Println("Detected reconnection from manager:")
+		brokerRes.Resend = true
 	}
 	if req.Parameters.ImageWidth == 16 && req.Parameters.Turns == 1 {
 		fmt.Println("\n", clientNum+1, res.World)
