@@ -16,6 +16,7 @@ import (
 //------------------GLOBAL VARIABLES AND APPLICABLE STRUCTS-------------------------
 type clientStruct struct {
 	clients [4]*rpc.Client
+	owner   string
 	lock    sync.Mutex
 }
 
@@ -111,6 +112,7 @@ setback:
 		for i := 0; i < WORKERS; i++ {
 			req.Paused = false
 			Clients.lock.Lock()
+			Clients.owner = "Broker manager"
 			j := HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &req, res, i, res)
 			Clients.lock.Unlock()
 			if j != 0 {
@@ -185,6 +187,7 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 	for i := 0; i < WORKERS; i++ {
 		i := i
 		Clients.lock.Lock()
+		Clients.owner = "KYS"
 		go func() { HandleCallAndError(Clients.clients[i], Shared.SuicideHandler, &request, response, i, response) }()
 		Clients.lock.Unlock()
 	}
@@ -200,6 +203,7 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 		i := i
 		request.Paused = !getPaused()
 		Clients.lock.Lock()
+		Clients.owner = "Broker Pause"
 		go func() { HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &request, response, i, response) }()
 		Clients.lock.Unlock()
 	}
@@ -214,6 +218,7 @@ func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *S
 	for i := 0; i < WORKERS; i++ {
 		i := i
 		Clients.lock.Lock()
+		Clients.owner = "Broker Background"
 		go func() { HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &request, response, i, response) }()
 		Clients.lock.Unlock()
 	}
@@ -238,6 +243,7 @@ func connectToWorkers() {
 		clientsConnections[i] = Shared.HandleCreateClientAndError(clientsPorts[i])
 	}
 	Clients.lock.Lock()
+	Clients.owner = "Setup"
 	Clients.clients = clientsConnections
 	Clients.lock.Unlock()
 }

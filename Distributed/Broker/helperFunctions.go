@@ -110,8 +110,10 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 
 func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int, brokerRes *Shared.Response) [][]byte {
 	Clients.lock.Lock()
+	Clients.owner = "manager"
 	var errorValue int = HandleCallAndError(Clients.clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
 	Clients.lock.Unlock()
+
 	if errorValue != 0 {
 		fmt.Println("world:", res.World)
 		brokerRes.Resend = true
@@ -182,12 +184,15 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 			if i != clientNum {
 				request.Paused = true
 				Clients.lock.Lock()
+				Clients.owner = "Call and Error Inner"
+				fmt.Println("Going in")
 				HandleCallAndError(Clients.clients[i], Shared.PauseHandler, request, response, clientNum, brokerRes)
 				Clients.lock.Unlock()
 			}
 		}
 		client := HandleCreateClientAndError(clientsPorts[clientNum])
 		Clients.lock.Lock()
+		Clients.owner = "Call and Error outer"
 		Clients.clients[clientNum] = client
 		Clients.lock.Unlock()
 		brokerRes.Resend = true

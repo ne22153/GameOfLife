@@ -76,6 +76,7 @@ func (s *GoLOperations) KYS(*Shared.Request, *Shared.Response) (err error) {
 // PauseManager :Handler whenever the user presses "p"
 //If already paused then unpause, otherwise pause.
 func (s *GoLOperations) PauseManager(req *Shared.Request, res *Shared.Response) (err error) {
+	fmt.Println("Pause manager")
 	if !req.Paused && paused.pause {
 		fmt.Println("Unlocking")
 		paused.lock.Unlock()
