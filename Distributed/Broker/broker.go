@@ -117,6 +117,7 @@ setback:
 		for i := 0; i < WORKERS; i++ {
 			req.Paused = false
 			j := HandleCallAndError(Clients[i], Shared.PauseHandler, &req, res, i, res)
+			fmt.Println("Rurning call print value: ", j)
 			fmt.Println("Didn't break here")
 			if j != 0 {
 				fmt.Println("going to the start ")
@@ -139,7 +140,7 @@ setback:
 	stripSizeList = distributeSliceSizes(req.Parameters)
 	fmt.Println(getCurrentTurn())
 	for i := turn; i < req.Parameters.Turns; i++ {
-		fmt.Println("Entering for loop")
+		//fmt.Println("Entering for loop")
 		//We now do split the input world for each thread accordingly
 		for j := 0; j < WORKERS; j++ {
 			waitGroup.Add(1)
@@ -151,17 +152,18 @@ setback:
 				&waitGroup, request, response, res)
 		}
 		waitGroup.Wait()
-		fmt.Println("Cleared waiting")
+		//fmt.Println("Cleared waiting")
 		if !res.Resend {
 			var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
 			changeCurrentTurn(i + 1)
 			changeCurrentWorld(newWorld)
 		} else {
+			fmt.Println("Detected reconnection:")
 			changePaused()
 			paused.lock.Lock()
 			goto setback //Jump back to the start if anything reconnects.
 		}
-		fmt.Println(getCurrentTurn())
+		//fmt.Println(getCurrentTurn())
 
 		//reportToController(req.Parameters, req.Events, getCurrentWorld(), newWorld)
 

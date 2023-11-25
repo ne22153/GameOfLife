@@ -112,9 +112,26 @@ func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [
 	return strip
 }
 
-func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int, brokerRes *Shared.Response) [][]byte {
-	HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
+func getAliveCellsCount(inputWorld [][]byte) int {
+	aliveCells := 0
 
+	for _, row := range inputWorld {
+		for _, tile := range row {
+			if tile == LIVE {
+				aliveCells++
+			}
+		}
+	}
+
+	return aliveCells
+}
+
+func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clientNum int, brokerRes *Shared.Response) [][]byte {
+	var j int = HandleCallAndError(Clients[clientNum], Shared.GoLHandler, &req, res, clientNum, brokerRes)
+
+	if j == 1 {
+		fmt.Println("We messed up in the manager - IDK Whtat to do fr fr")
+	}
 	//For some reason the response differs from within the call and out of the call
 	//The difference seems to be random every call, so perhaps issues with response access?
 
@@ -137,20 +154,6 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 	defer (*waitGroup).Done()
 }
 
-func getAliveCellsCount(inputWorld [][]byte) int {
-	aliveCells := 0
-
-	for _, row := range inputWorld {
-		for _, tile := range row {
-			if tile == LIVE {
-				aliveCells++
-			}
-		}
-	}
-
-	return aliveCells
-}
-
 func reportToController(p Shared.Params, events chan<- Shared.Event, oldWorld [][]byte, newWorld [][]byte) {
 	request, response := createRequestResponsePair(p, events)
 	request.OldWorld = oldWorld
@@ -160,20 +163,43 @@ func reportToController(p Shared.Params, events chan<- Shared.Event, oldWorld []
 }
 
 func HandleCreateClientAndError(serverPort string) *rpc.Client {
+	//Initial connection attempt
 	client, dialError := rpc.Dial("tcp", serverPort)
 
-	if dialError != nil {
-		time.Sleep(1 * time.Second)
-		client = HandleCreateClientAndError(serverPort)
+	fmt.Println("dialerror: ", dialError)
+
+pingLoop:
+	//Iterative solution
+	for {
+		//Busy waiting with 250ms ping
+		time.Sleep(250 * time.Millisecond)
+		fmt.Println("250ms ping")
+
+		//Reattempt
+		client, dialError = rpc.Dial("tcp", serverPort)
+		if dialError == nil {
+			break pingLoop
+		}
 	}
-	fmt.Println("Cliente: ", client)
+	//if dialError != nil {
+	//
+	//	time.Sleep(250 * time.Millisecond)
+	//	fmt.Println("Ping")
+	//	client = HandleCreateClientAndError(serverPort)
+	//}
+	fmt.Println("Client created: ", client)
 	return client
 }
 
 func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
-	request *Shared.Request, response *Shared.Response, clientNum int, brokerRes *Shared.Response) int {
-	var namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
+	request *Shared.Request, response *Shared.Response,
+	clientNum int, brokerRes *Shared.Response) int {
+	var namedFunctionHandlerError error = client.Call(namedFunctionHandler, request, response)
+
+	//fmt.Println("error: ", namedFunctionHandlerError)
 	if namedFunctionHandlerError != nil {
+
+		//Handle all other threads
 		for i := 0; i < WORKERS; i++ {
 			if i != clientNum {
 				request.Paused = true
@@ -181,10 +207,20 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 			}
 		}
 		client := HandleCreateClientAndError(clientsPorts[clientNum])
-		fmt.Println("client being weird? :", client)
+
 		Clients[clientNum] = client
 		brokerRes.Resend = true
+		response.Resend = true
+
+		fmt.Println("client being weird? :", client)
+		fmt.Println("Clients as list: ", Clients)
+		fmt.Println("broker response resend value: ", brokerRes.Resend)
+
+		time.Sleep(500 * time.Millisecond)
+
 		return 1
+
+		//If nothing needs to be resent (no disconnections)
 	} else {
 		brokerRes.Resend = false
 	}
@@ -193,16 +229,13 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 
 func flipWorldCellsIteration(oldWorld, newWorld [][]byte, turn, imageHeight, imageWidth int) []util.Cell {
 	var flippedCells []util.Cell
-	fmt.Println("Entering")
 	for i := 0; i < imageHeight; i++ {
 		for j := 0; j < imageWidth; j++ {
 			//If the cell has changed since the last iteration, we need to send an event to say so
 			if oldWorld[i][j] != newWorld[i][j] {
-				fmt.Println("I changed")
 				flippedCells = append(flippedCells, util.Cell{X: i, Y: j})
 			}
 		}
 	}
-	fmt.Println("Returning")
 	return flippedCells
 }

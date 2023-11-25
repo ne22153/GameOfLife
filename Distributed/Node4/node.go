@@ -52,19 +52,20 @@ func changeCurrentWorld(input [][]byte) {
 // GoLWorker does the actual working stuff
 func GoLWorker(inputWorld [][]byte, p Shared.Params) [][]byte {
 	var newWorld [][]byte
-	//fmt.Println(p.Turns)
 	if p.Turns == 0 {
 		if p.ImageHeight == 16 {
 			fmt.Println("Auto done: ", inputWorld)
 		}
 		return inputWorld
 	}
+	//fmt.Println("Height : ", p.ImageHeight, " Width : ", p.ImageWidth)
 	newWorld = worker(p.ImageHeight, p.ImageWidth, inputWorld)
 	//currentWorld <- newWorld
 	inputWorld = newWorld
 	//turn <- i + 1
 	changeCurrentWorld(inputWorld)
 
+	fmt.Println("Pausing")
 	paused.lock.Lock()
 	paused.lock.Unlock()
 	//Once all turns have been processed, free the condition variable
@@ -108,6 +109,7 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 	//There already existed a GoL instance running (due to keypress Q, do this)
 	/*if paused.pause {
 		//Restarts the GoL instance running
+		//fmt.Println("continuing old")
 		paused.pause = !paused.pause
 		paused.lock.Unlock()
 
@@ -115,20 +117,21 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 		currentWorld.lock.Lock()
 		res.World = currentWorld.world
 		currentWorld.lock.Unlock()
-	} else {*/ //If the node is fresh and no previous GoL instance was running in the past
+	} else { */ //If the node is fresh and no previous GoL instance was running in the past
 	fmt.Println("Called")
 	condition.Add(1)
 	res.World = GoLWorker(req.World, req.Parameters)
 	if req.Parameters.ImageWidth == 16 && req.Parameters.Turns == 1 {
 		fmt.Println(res.World)
 	}
+	fmt.Println("Done")
 	return
 }
 
 // KYS :Handler whenever the user presses "K".
 //Called from the local controller to tell the AWS node to kill itself
 func (s *GoLOperations) KYS(*Shared.Request, *Shared.Response) (err error) {
-	fmt.Println("Terminated sucessfully")
+	fmt.Println("Terminated successfully")
 
 	defer os.Exit(0)
 	return
@@ -161,7 +164,9 @@ func (s *GoLOperations) BackgroundManager(*Shared.Request, *Shared.Response) (er
 }
 
 func main() {
+	fmt.Println("hi")
 	pAddr := flag.String("port", "8034", "Port to listen on")
+	fmt.Println(*pAddr)
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 	Shared.HandleRegisterAndError(&GoLOperations{})
