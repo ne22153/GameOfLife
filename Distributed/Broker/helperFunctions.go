@@ -287,7 +287,6 @@ func flipWorldCellsIteration(oldWorld, newWorld [][]byte, imageHeight, imageWidt
 	var flippedCells []util.Cell
 	for i := 0; i < imageHeight; i++ {
 		for j := 0; j < imageWidth; j++ {
-
 			if oldWorld[i][j] == LIVE {
 				flippedCells = append(flippedCells, util.Cell{X: j, Y: i})
 			}

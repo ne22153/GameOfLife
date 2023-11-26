@@ -193,14 +193,15 @@ restart:
 
 func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) (err error) {
 	currentWorld.lock.Lock()
+	currentTurn.lock.Lock()
 
 	res.World = currentWorld.world
 	res.AliveCells = getAliveCellsCount(currentWorld.world)
 	res.FlippedCells = flipWorldCellsIteration(req.World, currentWorld.world, req.Parameters.ImageHeight, req.Parameters.ImageWidth)
-	res.Turns = getCurrentTurn()
+	res.Turns = currentTurn.turn
 
 	currentWorld.lock.Unlock()
-	res.Turns = getCurrentTurn()
+	currentTurn.lock.Unlock()
 	return
 }
 
