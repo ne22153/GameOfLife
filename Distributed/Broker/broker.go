@@ -14,13 +14,13 @@ import (
 )
 
 //------------------GLOBAL VARIABLES AND APPLICABLE STRUCTS-------------------------
+
+//The client struct contains an owner : string in order to be used for debugging purposes.
 type clientStruct struct {
 	clients [4]*rpc.Client
 	owner   string
 	lock    sync.Mutex
 }
-
-var Clients clientStruct
 
 type currentTurnStruct struct {
 	turn int
@@ -40,6 +40,13 @@ type pauseStruct struct {
 	pause bool
 	lock  sync.Mutex
 }
+
+type waitgroupDebug struct {
+	waitGroup sync.WaitGroup
+	count     int
+}
+
+var Clients clientStruct
 
 var paused pauseStruct
 
@@ -103,28 +110,15 @@ type BrokerOperations struct{}
 
 // GoLManager Breaks up the world and sends it to the workers
 func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) (err error) {
-setback:
-	var waitGroup sync.WaitGroup
+restart:
+	var waitGroup waitgroupDebug = waitgroupDebug{count: 0}
+	//var waitGroup sync.WaitGroup
 	var turn int
-	if paused.pause {
-		paused.pause = !paused.pause
-		paused.lock.Unlock()
-		for i := 0; i < WORKERS; i++ {
-			req.Paused = false
-			Clients.lock.Lock()
-			Clients.owner = "Broker manager"
-			fmt.Println("CLAIMED by", Clients.owner)
-			j := HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &req, res, i, res)
-			Clients.lock.Unlock()
-			if j != 0 {
-				goto setback
-			}
-		}
+	var restartFlag bool = false
 
-		turn = getCurrentTurn()
-	} else {
-		turn = 0
-		changeCurrentWorld(req.World)
+	turn, restartFlag = initializeWorkerStates(&req, res, res, turn)
+	if restartFlag {
+		goto restart
 	}
 
 	for j := 0; j < WORKERS; j++ {
@@ -135,35 +129,31 @@ setback:
 	for i := turn; i < req.Parameters.Turns; i++ {
 		//We now do split the input world for each thread accordingly
 		for j := 0; j < WORKERS; j++ {
-			//fmt.Println("hi")
-			waitGroup.Add(1)
-			//fmt.Println("hii")
+			waitGroup.waitGroup.Add(1)
+			waitGroup.count++
+			fmt.Println(waitGroup.count)
 			//We execute the workers concurrently
 			var request, response = createRequestResponsePair(req.Parameters, req.Events)
 			//fmt.Println("Hi")
 			request.World = getCurrentWorld()
 			//fmt.Println("Hii")
-			executeWorker(request.World, workerChannelList,
+			go executeWorker(request.World, workerChannelList,
 				stripSizeList[j], req.Parameters.ImageHeight, req.Parameters.ImageWidth, j,
 				&waitGroup, request, response, res)
 			fmt.Println("goroutine done bruh")
 			if res.Resend {
 				changePaused()
 				paused.lock.Lock()
-				goto setback
+				goto restart
 			}
 		}
 		fmt.Println("Made it out, waiting")
-		waitGroup.Wait()
+		waitGroup.waitGroup.Wait()
 		fmt.Println("Cont")
-		if !res.Resend {
-			var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
-			changeCurrentTurn(i + 1)
-			changeCurrentWorld(newWorld)
-		} else {
-			changePaused()
-			paused.lock.Lock()
-			goto setback //Jump back to the start if anything reconnects.
+
+		restartFlag = checkForResend(res, i)
+		if restartFlag {
+			goto restart
 		}
 
 		//reportToController(req.Parameters, req.Events, getCurrentWorld(), newWorld)

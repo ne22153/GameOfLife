@@ -4,11 +4,66 @@ import (
 	"fmt"
 	"math"
 	"net/rpc"
-	"sync"
 	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 	"uk.ac.bris.cs/gameoflife/util"
 )
+
+// Helper function of GoLManager
+// initializeWorkerStates returns a (int, bool) pair of the turn and a flag determining if a goto back to
+//start of the function is needed
+// bool = true if there already exists a game state
+// bool = false if there is no game state -> make a fresh game state
+func initializeWorkerStates(request *Shared.Request, response *Shared.Response, brokerResponse *Shared.Response,
+	turn int) (int, bool) {
+	var restartFlag bool = false
+
+	//If paused.pause is true, this implies that there was a pre-existing game state either due to pausing or
+	//disconnection from an AWS node. In this case, simply restart whatever state the game was previously in.
+	if paused.pause {
+		paused.pause = !paused.pause
+		paused.lock.Unlock()
+		for i := 0; i < WORKERS; i++ {
+			request.Paused = false
+			Clients.lock.Lock()
+			Clients.owner = "Broker manager"
+			fmt.Println("CLAIMED by", Clients.owner)
+			j := HandleCallAndError(Clients.clients[i], Shared.PauseHandler, request, response, i, brokerResponse)
+			Clients.lock.Unlock()
+			if j != 0 {
+				restartFlag = true
+			}
+		}
+
+		turn = getCurrentTurn()
+
+		//Otherwise, start the game anew.
+	} else {
+		turn = 0
+		changeCurrentWorld(request.World)
+	}
+
+	return turn, restartFlag
+
+}
+
+// Helper function for GoLManager
+// will check if broker response is true, then it will set the restart flag to true
+func checkForResend(response *Shared.Response, turnNum int) bool {
+
+	var restartFlag bool = false
+	if !response.Resend {
+		var newWorld = mergeWorkerStrips(response.World, workerChannelList, stripSizeList)
+		changeCurrentTurn(turnNum + 1)
+		changeCurrentWorld(newWorld)
+	} else {
+		changePaused()
+		paused.lock.Lock()
+		restartFlag = true
+	}
+
+	return restartFlag
+}
 
 func createRequestResponsePair(p Shared.Params, events chan<- Shared.Event) (Shared.Request, *Shared.Response) {
 
@@ -118,7 +173,8 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 
 	if errorValue != 0 {
 		fmt.Println("world:", res.World)
-		//brokerRes.Resend = true
+		fmt.Println("Detected reconnection. Giving 1 second reconnection buffer")
+		time.Sleep(1 * time.Second)
 	} else {
 		fmt.Println("Released by manager ", clientNum+1)
 	}
@@ -130,15 +186,22 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 //Creates a strip for the worker and then the worker will perform GoL algorithm on such strip
 func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, stripSize int, imageWidth,
 	imageHeight,
-	workerNumber int, waitGroup *sync.WaitGroup, req Shared.Request, res *Shared.Response, brokerRes *Shared.Response) {
+	workerNumber int, waitGroup *waitgroupDebug, req Shared.Request, res *Shared.Response, brokerRes *Shared.Response) {
+	
 	req.World = createStrip(inputWorld, stripSize,
 		workerNumber, imageHeight)
 	req.Parameters.ImageHeight = (stripSize) + BUFFER
 	workerChannelList[workerNumber] <- manager(req, res,
 		workerChannelList[workerNumber], workerNumber, brokerRes)
 	defer func() {
-		(*waitGroup).Done()
-		fmt.Println("Completed the goroutine")
+		(*waitGroup).waitGroup.Done()
+		(*waitGroup).count--
+
+		if brokerRes.Resend {
+			fmt.Println("waitgroup after done: ", (*waitGroup).count)
+			fmt.Println("Completed the goroutine")
+			fmt.Println("will resend!")
+		}
 	}()
 }
 
@@ -172,11 +235,6 @@ func HandleCreateClientAndError(serverPort string) *rpc.Client {
 
 	}
 
-	//if dialError != nil {
-	//	time.Sleep(1 * time.Second)
-	//	client = HandleCreateClientAndError(serverPort)
-	//}
-
 	return client
 }
 
@@ -209,10 +267,7 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 		fmt.Println("Aha")
 		client := HandleCreateClientAndError(clientsPorts[clientNum])
 		fmt.Println("waiting for the owner")
-		/*if Clients.owner == "manager" {
-			Clients.lock.Unlock()
-			Clients.owner = "unlock check"
-		}*/
+
 		Clients.lock.Lock()
 		Clients.owner = "Call and Error outer"
 		fmt.Println("CLAIMED by", Clients.owner)
@@ -231,15 +286,12 @@ func flipWorldCellsIteration(oldWorld, newWorld [][]byte, imageHeight, imageWidt
 	var flippedCells []util.Cell
 	for i := 0; i < imageHeight; i++ {
 		for j := 0; j < imageWidth; j++ {
-			//If the cell has changed since the last iteration, we need to send an event to say so
-			/*if oldWorld[i][j] != newWorld[i][j] {
-				flippedCells = append(flippedCells, util.Cell{X: i, Y: j})
-			}*/
+
 			if oldWorld[i][j] == LIVE {
-				flippedCells = append(flippedCells, util.Cell{X: i, Y: j})
+				flippedCells = append(flippedCells, util.Cell{X: j, Y: i})
 			}
 			if newWorld[i][j] == LIVE {
-				flippedCells = append(flippedCells, util.Cell{X: i, Y: j})
+				flippedCells = append(flippedCells, util.Cell{X: j, Y: i})
 			}
 		}
 	}

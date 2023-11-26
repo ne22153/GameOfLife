@@ -16,6 +16,9 @@ type Params struct {
 
 var GoLHandler = "GoLOperations.GoLManager"
 var SuicideHandler = "GoLOperations.KYS"
+
+// PauseManager :Handler whenever the user presses "p"
+//If already paused then unpause, otherwise pause.
 var PauseHandler = "GoLOperations.PauseManager"
 var BackgroundHandler = "GoLOperations.BackgroundManager"
 
