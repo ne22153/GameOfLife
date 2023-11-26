@@ -110,16 +110,11 @@ type BrokerOperations struct{}
 
 // GoLManager Breaks up the world and sends it to the workers
 func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) (err error) {
-restart:
 	var waitGroup waitgroupDebug = waitgroupDebug{count: 0}
 	//var waitGroup sync.WaitGroup
 	var turn int
-	var restartFlag bool = false
 
-	turn, restartFlag = initializeWorkerStates(&req, res, res, turn)
-	if restartFlag {
-		goto restart
-	}
+	turn = initializeWorkerStates(&req, res, res, turn)
 
 	for j := 0; j < WORKERS; j++ {
 		var workerChannel = make(chan [][]byte, 2)
@@ -142,25 +137,12 @@ restart:
 					stripSizeList[workernumber], req.Parameters.ImageHeight, req.Parameters.ImageWidth, workernumber,
 					&waitGroup, request, response, res)
 			}(j)
-
-			fmt.Println("broke out of go")
-
-			if res.Resend {
-				changePaused()
-				paused.lock.Lock()
-				goto restart
-			}
 		}
-		fmt.Println("Made it out, waiting")
 		waitGroup.waitGroup.Wait()
-		fmt.Println("Cont")
 
-		restartFlag = checkForResend(res, i)
-		if restartFlag {
-			goto restart
-		}
-
-		//reportToController(req.Parameters, req.Events, getCurrentWorld(), newWorld)
+		var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
+		changeCurrentTurn(i + 1)
+		changeCurrentWorld(newWorld)
 
 		paused.lock.Lock()
 		paused.lock.Unlock()

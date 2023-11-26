@@ -10,13 +10,8 @@ import (
 )
 
 // Helper function of GoLManager
-// initializeWorkerStates returns a (int, bool) pair of the turn and a flag determining if a goto back to
-//start of the function is needed
-// bool = true if there already exists a game state
-// bool = false if there is no game state -> make a fresh game state
 func initializeWorkerStates(request *Shared.Request, response *Shared.Response, brokerResponse *Shared.Response,
-	turn int) (int, bool) {
-	var restartFlag bool = false
+	turn int) int {
 
 	//If paused.pause is true, this implies that there was a pre-existing game state either due to pausing or
 	//disconnection from an AWS node. In this case, simply restart whatever state the game was previously in.
@@ -31,7 +26,6 @@ func initializeWorkerStates(request *Shared.Request, response *Shared.Response, 
 			j := HandleCallAndError(Clients.clients[i], Shared.PauseHandler, request, response, i, brokerResponse)
 			Clients.lock.Unlock()
 			if j != 0 {
-				restartFlag = true
 			}
 		}
 
@@ -43,26 +37,8 @@ func initializeWorkerStates(request *Shared.Request, response *Shared.Response, 
 		changeCurrentWorld(request.World)
 	}
 
-	return turn, restartFlag
+	return turn
 
-}
-
-// Helper function for GoLManager
-// will check if broker response is true, then it will set the restart flag to true
-func checkForResend(response *Shared.Response, turnNum int) bool {
-
-	var restartFlag bool = false
-	if !response.Resend {
-		var newWorld = mergeWorkerStrips(response.World, workerChannelList, stripSizeList)
-		changeCurrentTurn(turnNum + 1)
-		changeCurrentWorld(newWorld)
-	} else {
-		changePaused()
-		paused.lock.Lock()
-		restartFlag = true
-	}
-
-	return restartFlag
 }
 
 func createRequestResponsePair(p Shared.Params, events chan<- Shared.Event) (Shared.Request, *Shared.Response) {
@@ -197,13 +173,6 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 	defer func() {
 		(*waitGroup).waitGroup.Done()
 		(*waitGroup).count--
-
-		if brokerRes.Resend {
-			fmt.Println("waitgroup after done: ", (*waitGroup).count)
-			fmt.Println("Completed the goroutine")
-			fmt.Println("will resend!")
-		}
-
 	}()
 }
 
@@ -267,10 +236,7 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 		Clients.clients[clientNum] = client
 		Clients.lock.Unlock()
 	}
-
-	//Since we know the error is definitely nil (otherwise it won't break the for we don't need to resend anything
-	//anymore
-	brokerRes.Resend = false
+	
 	fmt.Println("Finishing worker ", clientNum+1)
 
 	return 0

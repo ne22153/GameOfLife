@@ -32,7 +32,6 @@ type Response struct {
 	World        [][]byte
 	AliveCells   int
 	Turns        int
-	Resend       bool
 	FlippedCells []util.Cell
 }
 
