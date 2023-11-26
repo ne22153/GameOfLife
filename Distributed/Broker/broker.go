@@ -110,7 +110,7 @@ type BrokerOperations struct{}
 
 // GoLManager Breaks up the world and sends it to the workers
 func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) (err error) {
-	var waitGroup waitgroupDebug = waitgroupDebug{count: 0}
+	var waitGroup sync.WaitGroup
 	//var waitGroup sync.WaitGroup
 	var turn int
 
@@ -125,9 +125,8 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 		//We now do split the input world for each thread accordingly
 		for j := 0; j < WORKERS; j++ {
 
-			waitGroup.waitGroup.Add(1)
-			waitGroup.count++
-			fmt.Println(waitGroup.count)
+			waitGroup.Add(1)
+
 			//We execute the workers concurrently
 			var request, response = createRequestResponsePair(req.Parameters, req.Events)
 			request.World = getCurrentWorld()
@@ -138,7 +137,7 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 					&waitGroup, request, response, res)
 			}(j)
 		}
-		waitGroup.waitGroup.Wait()
+		waitGroup.Wait()
 
 		var newWorld = mergeWorkerStrips(res.World, workerChannelList, stripSizeList)
 		changeCurrentTurn(i + 1)
@@ -168,6 +167,7 @@ func (s *BrokerOperations) BrokerInfo(req Shared.Request, res *Shared.Response) 
 // KYS :Handler whenever the user presses "K".
 //Called from the local controller to tell the AWS node to kill itself
 func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response) (err error) {
+
 	for i := 0; i < WORKERS; i++ {
 		i := i
 		Clients.lock.Lock()
