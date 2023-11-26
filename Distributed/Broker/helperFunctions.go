@@ -235,8 +235,9 @@ func HandleCreateClientAndError(serverPort string) *rpc.Client {
 	for {
 		if dialError != nil {
 			time.Sleep(500 * time.Millisecond)
+			fmt.Println("ping: waiting for node to reconnect")
+
 			client, dialError = rpc.Dial("tcp", serverPort)
-			fmt.Println("Bryuh")
 		} else {
 			//If there is no error, we can break out
 			break
@@ -253,61 +254,32 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 		fmt.Println("Sending to worker ", clientNum+1)
 	}
 	var namedFunctionHandlerError error
+
+	//This will essentially busy wait until a client is reconnected. Instead of handling the error, simply run it
+	//continously until there is no error
 	for {
 
 		namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
 		fmt.Println(namedFunctionHandlerError)
+		//Escape hatch!
 		if namedFunctionHandlerError == nil {
 			break
 		}
 
 		client = HandleCreateClientAndError(clientsPorts[clientNum])
 
-		time.Sleep(250 * time.Millisecond)
 		Clients.lock.Lock()
 		Clients.owner = "Call and Error outer"
 		fmt.Println("CLAIMED by", Clients.owner)
 		Clients.clients[clientNum] = client
 		Clients.lock.Unlock()
-		brokerRes.Resend = true
-
 	}
 
-	if namedFunctionHandlerError != nil {
-		fmt.Println(namedFunctionHandlerError)
-		for i := 0; i < WORKERS; i++ {
-			if i != clientNum {
-				/*if namedFunctionHandler == Shared.GoLHandler {
-					Clients.lock.Unlock()
-					fmt.Println("Released by handler")
-					namedFunctionHandler = "errorHandler"
-				}*/
-				fmt.Println("Entering ", i+1)
-				request.Paused = true
-				Clients.lock.Lock()
-				Clients.owner = "Call and Error Inner"
-				fmt.Println("CLAIMED by", Clients.owner)
-				fmt.Println("Going in")
-				HandleCallAndError(Clients.clients[i], Shared.PauseHandler, request, response, clientNum, brokerRes)
-				fmt.Println("Done for ", i+1)
-				Clients.lock.Unlock()
-			}
-		}
-		fmt.Println("Aha")
-		client := HandleCreateClientAndError(clientsPorts[clientNum])
-		fmt.Println("waiting for the owner")
+	//Since we know the error is definitely nil (otherwise it won't break the for we don't need to resend anything
+	//anymore
+	brokerRes.Resend = false
+	fmt.Println("Finishing worker ", clientNum+1)
 
-		Clients.lock.Lock()
-		Clients.owner = "Call and Error outer"
-		fmt.Println("CLAIMED by", Clients.owner)
-		Clients.clients[clientNum] = client
-		Clients.lock.Unlock()
-		brokerRes.Resend = true
-		return 1
-	} else {
-		brokerRes.Resend = false
-		fmt.Println("Finishing worker ", clientNum+1)
-	}
 	return 0
 }
 
