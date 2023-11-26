@@ -164,7 +164,7 @@ restart:
 				//
 				//fmt.Println("done the shit")
 			}(j)
-			
+
 			fmt.Println("broke out of go")
 
 			if res.Resend {

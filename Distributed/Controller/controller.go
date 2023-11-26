@@ -55,6 +55,7 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 		CompletedTurns: params.Turns,
 		Alive:          calculateAliveCells(response.World)}
 	//Shut down the game safely
+
 	defer handleGameShutDown(client, response, params, channels, ticker)
 }
 

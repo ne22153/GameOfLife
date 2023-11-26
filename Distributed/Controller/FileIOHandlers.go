@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 )
@@ -38,4 +39,5 @@ func writeToFileIO(world [][]byte, p Shared.Params, filename string,
 			c.ioOutput <- world[i][j]
 		}
 	}
+	fmt.Println("written to: ", filename)
 }

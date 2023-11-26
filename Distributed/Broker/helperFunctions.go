@@ -173,8 +173,8 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 
 	if errorValue != 0 {
 		fmt.Println("world:", res.World)
-		fmt.Println("Detected reconnection. Giving 1 second reconnection buffer")
-		time.Sleep(1 * time.Second)
+		fmt.Println("Detected reconnection.")
+		//time.Sleep(1 * time.Second)
 	} else {
 		fmt.Println("Released by manager ", clientNum+1)
 	}
@@ -252,7 +252,27 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 	if namedFunctionHandler == Shared.GoLHandler {
 		fmt.Println("Sending to worker ", clientNum+1)
 	}
-	var namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
+	var namedFunctionHandlerError error
+	for {
+
+		namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
+		fmt.Println(namedFunctionHandlerError)
+		if namedFunctionHandlerError == nil {
+			break
+		}
+
+		client = HandleCreateClientAndError(clientsPorts[clientNum])
+
+		time.Sleep(250 * time.Millisecond)
+		Clients.lock.Lock()
+		Clients.owner = "Call and Error outer"
+		fmt.Println("CLAIMED by", Clients.owner)
+		Clients.clients[clientNum] = client
+		Clients.lock.Unlock()
+		brokerRes.Resend = true
+
+	}
+
 	if namedFunctionHandlerError != nil {
 		fmt.Println(namedFunctionHandlerError)
 		for i := 0; i < WORKERS; i++ {
