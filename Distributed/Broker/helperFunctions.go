@@ -174,7 +174,6 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 	if errorValue != 0 {
 		fmt.Println("world:", res.World)
 		fmt.Println("Detected reconnection.")
-		//time.Sleep(1 * time.Second)
 	} else {
 		fmt.Println("Released by manager ", clientNum+1)
 	}
@@ -187,7 +186,7 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, stripSize int, imageWidth,
 	imageHeight,
 	workerNumber int, waitGroup *waitgroupDebug, req Shared.Request, res *Shared.Response,
-	brokerRes *Shared.Response, quitChannel chan<- bool) {
+	brokerRes *Shared.Response) {
 
 	req.World = createStrip(inputWorld, stripSize,
 		workerNumber, imageHeight)
@@ -195,9 +194,6 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 	workerChannelList[workerNumber] <- manager(req, res,
 		workerChannelList[workerNumber], workerNumber, brokerRes)
 
-	if brokerRes.Resend {
-		print("help[er/?")
-	}
 	defer func() {
 		(*waitGroup).waitGroup.Done()
 		(*waitGroup).count--
@@ -206,9 +202,6 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 			fmt.Println("waitgroup after done: ", (*waitGroup).count)
 			fmt.Println("Completed the goroutine")
 			fmt.Println("will resend!")
-			quitChannel <- true
-		} else {
-			quitChannel <- false
 		}
 
 	}()

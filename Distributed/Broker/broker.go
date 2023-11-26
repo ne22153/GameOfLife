@@ -135,34 +135,12 @@ restart:
 			fmt.Println(waitGroup.count)
 			//We execute the workers concurrently
 			var request, response = createRequestResponsePair(req.Parameters, req.Events)
-			//fmt.Println("Hi")
 			request.World = getCurrentWorld()
-			//fmt.Println("Hii")
 
-			var quitChannel chan bool = make(chan bool, 1)
 			go func(workernumber int) {
-
-				fmt.Println(stripSizeList, workernumber)
-
 				executeWorker(request.World, workerChannelList,
 					stripSizeList[workernumber], req.Parameters.ImageHeight, req.Parameters.ImageWidth, workernumber,
-					&waitGroup, request, response, res, quitChannel)
-
-				for {
-					select {
-					case restartFlag = <-quitChannel:
-						fmt.Println("yeah fr")
-						return
-					default:
-						fmt.Println("omg wtf have you done")
-					}
-
-				}
-				//restartFlag = <-quitChannel
-				//
-				//fmt.Println("goroutine done bruh")
-				//
-				//fmt.Println("done the shit")
+					&waitGroup, request, response, res)
 			}(j)
 
 			fmt.Println("broke out of go")
