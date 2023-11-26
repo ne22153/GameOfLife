@@ -186,13 +186,18 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 //Creates a strip for the worker and then the worker will perform GoL algorithm on such strip
 func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, stripSize int, imageWidth,
 	imageHeight,
-	workerNumber int, waitGroup *waitgroupDebug, req Shared.Request, res *Shared.Response, brokerRes *Shared.Response) {
-	
+	workerNumber int, waitGroup *waitgroupDebug, req Shared.Request, res *Shared.Response,
+	brokerRes *Shared.Response, quitChannel chan<- bool) {
+
 	req.World = createStrip(inputWorld, stripSize,
 		workerNumber, imageHeight)
 	req.Parameters.ImageHeight = (stripSize) + BUFFER
 	workerChannelList[workerNumber] <- manager(req, res,
 		workerChannelList[workerNumber], workerNumber, brokerRes)
+
+	if brokerRes.Resend {
+		print("help[er/?")
+	}
 	defer func() {
 		(*waitGroup).waitGroup.Done()
 		(*waitGroup).count--
@@ -201,7 +206,11 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 			fmt.Println("waitgroup after done: ", (*waitGroup).count)
 			fmt.Println("Completed the goroutine")
 			fmt.Println("will resend!")
+			quitChannel <- true
+		} else {
+			quitChannel <- false
 		}
+
 	}()
 }
 

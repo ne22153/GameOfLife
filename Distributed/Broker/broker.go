@@ -129,6 +129,7 @@ restart:
 	for i := turn; i < req.Parameters.Turns; i++ {
 		//We now do split the input world for each thread accordingly
 		for j := 0; j < WORKERS; j++ {
+
 			waitGroup.waitGroup.Add(1)
 			waitGroup.count++
 			fmt.Println(waitGroup.count)
@@ -137,10 +138,35 @@ restart:
 			//fmt.Println("Hi")
 			request.World = getCurrentWorld()
 			//fmt.Println("Hii")
-			go executeWorker(request.World, workerChannelList,
-				stripSizeList[j], req.Parameters.ImageHeight, req.Parameters.ImageWidth, j,
-				&waitGroup, request, response, res)
-			fmt.Println("goroutine done bruh")
+
+			var quitChannel chan bool = make(chan bool, 1)
+			go func(workernumber int) {
+
+				fmt.Println(stripSizeList, workernumber)
+
+				executeWorker(request.World, workerChannelList,
+					stripSizeList[workernumber], req.Parameters.ImageHeight, req.Parameters.ImageWidth, workernumber,
+					&waitGroup, request, response, res, quitChannel)
+
+				for {
+					select {
+					case restartFlag = <-quitChannel:
+						fmt.Println("yeah fr")
+						return
+					default:
+						fmt.Println("omg wtf have you done")
+					}
+
+				}
+				//restartFlag = <-quitChannel
+				//
+				//fmt.Println("goroutine done bruh")
+				//
+				//fmt.Println("done the shit")
+			}(j)
+			
+			fmt.Println("broke out of go")
+
 			if res.Resend {
 				changePaused()
 				paused.lock.Lock()
