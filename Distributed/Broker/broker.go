@@ -195,6 +195,7 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 		Clients.lock.Unlock()
 	}
 	time.Sleep(1 * time.Second)
+	fmt.Println("Terminated Sucessfully")
 	os.Exit(0)
 	return
 }

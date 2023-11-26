@@ -127,9 +127,14 @@ func determineKeyPress(client *rpc.Client, keyPresses <-chan rune,
 		select {
 		case key := <-keyPresses:
 			if key == 'k' {
-				Shared.HandleCallAndError(client, Shared.BrokerInfo, req, res)
-				Shared.HandleCallAndError(client, Shared.BrokerKill, req, res)
-				handleGameShutDown(client, res, req.Parameters, c, ticker)
+				//Making this go-wrapped prevents an EOL error
+				go func() {
+					Shared.HandleCallAndError(client, Shared.BrokerInfo, req, res)
+					Shared.HandleCallAndError(client, Shared.BrokerKill, req, res)
+					handleGameShutDown(client, res, req.Parameters, c, ticker)
+				}()
+				time.Sleep(1 * time.Second)
+				fmt.Println("Terminated sucessfully")
 				os.Exit(0)
 			} else if key == 's' {
 				Shared.HandleCallAndError(client, Shared.BrokerInfo, req, res)
