@@ -26,6 +26,8 @@ type distributorChannels struct {
 	ioInput    <-chan byte
 }
 
+var resourceLock sync.Mutex
+
 //Helper function to distributor to find the number of alive cells adjacent to the tile
 func calculateAliveCells(world [][]byte) []util.Cell {
 	var coordinates []util.Cell
@@ -155,7 +157,10 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 
 				var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.
 					Itoa(turns)
+
+				//resourceLock.Lock()
 				writeToFileIO(inputWorld, p, filename, c)
+				//resourceLock.Unlock()
 			} else if key == 'p' {
 				//When p is pressed, pause the processing and print the current turn that is being processed
 				//If p is pressed again resume the processing
@@ -170,7 +175,14 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 
 			} else if key == 'q' {
 				//When q is pressed, generate a PGM file with the current state of the board then terminate
+				//resourceLock.Lock()
+				//inputWorldCopy
+				// := copy(inital)
+				//resourceLock.Unlock()
+
+				//resourceLock.Lock()
 				handleGameShutDown(inputWorld, p, turns, c, aliveCellsTicker)
+				//resourceLock.Unlock()
 				//Exit the program
 				os.Exit(0)
 			}
@@ -188,7 +200,16 @@ func aliveCellsReporter(turn, aliveCells *int, ticker *time.Ticker, c distributo
 	for {
 		select {
 		case <-ticker.C:
-			c.events <- AliveCellsCount{*turn, *aliveCells}
+
+			//We make an immutable copy of a mutable reference such that this prevents deadlocks
+			//Just accept it works
+			resourceLock.Lock()
+			t := *turn
+			a := *aliveCells
+			resourceLock.Unlock()
+			//resourceLock.Lock()
+			c.events <- AliveCellsCount{t, a}
+			//resourceLock.Unlock()
 		}
 	}
 }
@@ -300,10 +321,14 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			}
 			waitGroup.Wait()
 
+			resourceLock.Lock()
 			newWorld = mergeWorkerStrips(newWorld, workerChannelList, stripSizeList)
+			resourceLock.Unlock()
 		}
+		resourceLock.Lock()
 		aliveCells = getAliveCellsCount(newWorld)
 		turn++
+		resourceLock.Unlock()
 		turnChannel <- turn
 
 		//Update alive cells
