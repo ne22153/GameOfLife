@@ -1,6 +1,8 @@
 package gol
 
-import "strconv"
+import (
+	"strconv"
+)
 
 //Helper function of distributor. We use this to create an initial world map from a file name
 func writeFromFileIO(imageHeight, imageWidth int, c distributorChannels) [][]byte {

@@ -16,6 +16,7 @@ const DEAD = 0
 // BUFFER We make a const for a buffer size stand in
 const BUFFER = 2
 
+//Whenever we do a r/w of world or turn we lock and unlock (prevent data races)s
 var worldLock sync.Mutex
 var turnLock sync.Mutex
 
@@ -138,8 +139,6 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 func getAliveCellsCount(inputWorld [][]byte) int {
 	aliveCells := 0
 
-	worldLock.Lock()
-	turnLock.Lock()
 	rows := inputWorld
 
 	for _, row := range rows {
@@ -149,8 +148,7 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 			}
 		}
 	}
-	turnLock.Unlock()
-	worldLock.Unlock()
+
 	return aliveCells
 }
 
@@ -165,12 +163,18 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 			if key == 's' {
 				//When s is pressed, we need to generate a PGM file with the current state of the board
 
+				worldLock.Lock()
+				turnLock.Lock()
 				var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.
 					Itoa(turns)
 				writeToFileIO(inputWorld, p, filename, c)
+				turnLock.Unlock()
+				worldLock.Unlock()
 			} else if key == 'p' {
 				//When p is pressed, pause the processing and print the current turn that is being processed
 				//If p is pressed again resume the processing
+				worldLock.Lock()
+				turnLock.Lock()
 				if paused {
 					c.events <- StateChange{turns, Executing}
 					paused = !paused
@@ -179,16 +183,26 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 					c.events <- StateChange{turns, Paused}
 					paused = !paused
 				}
+				worldLock.Unlock()
+				turnLock.Unlock()
 
 			} else if key == 'q' {
 				//When q is pressed, generate a PGM file with the current state of the board then terminate
+
+				turnLock.Lock()
+				worldLock.Lock()
 				handleGameShutDown(inputWorld, p, turns, c, aliveCellsTicker)
+				turnLock.Unlock()
+				worldLock.Unlock()
 				//Exit the program
+
 				os.Exit(0)
 			}
 		//When turn is incremented, we're informed of the change
 		case t := <-turn:
+			turnLock.Lock()
 			turns = t
+			turnLock.Unlock()
 			if !paused {
 				pauseChannel <- true
 			}
@@ -200,8 +214,8 @@ func aliveCellsReporter(turn, aliveCells *int, ticker *time.Ticker, c distributo
 	for {
 		select {
 		case <-ticker.C:
-			worldLock.Lock()
 			turnLock.Lock()
+			worldLock.Lock()
 			c.events <- AliveCellsCount{*turn, *aliveCells}
 			turnLock.Unlock()
 			worldLock.Unlock()
@@ -254,8 +268,8 @@ func mergeWorkerStrips(newWorld [][]byte, workerChannelList []chan [][]byte, str
 //Performs necessary logic to end the game neatly
 func handleGameShutDown(world [][]byte, p Params, turns int, c distributorChannels,
 	ticker *time.Ticker) {
-	var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(turns)
 
+	var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(turns)
 	writeToFileIO(world, p, filename, c)
 
 	//Make sure that the Io has finished any output before exiting.
@@ -283,6 +297,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	aliveCellsTicker := time.NewTicker(2 * time.Second)
 
 	//We report the alive cells every two secs
+
 	go aliveCellsReporter(&turn, &aliveCells, aliveCellsTicker, c)
 
 	var turnChannel = make(chan int)
@@ -290,8 +305,12 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	//Keep track of any key presses by the user
 	go goPressTrack(inputWorld, keyPresses, c, p, turnChannel, aliveCellsTicker, pauseChannel)
 
+	turnLock.Lock()
+	worldLock.Lock()
 	//We flip the cells
 	flipWorldCellsInitial(inputWorld, p.ImageHeight, p.ImageWidth, turn, c)
+	turnLock.Unlock()
+	worldLock.Unlock()
 
 	//Run the GoL algorithm for specified number of turns
 	for i := 0; i < p.Turns; i++ {
@@ -320,21 +339,29 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			newWorld = mergeWorkerStrips(newWorld, workerChannelList, stripSizeList)
 			worldLock.Unlock()
 		}
-		aliveCells = getAliveCellsCount(newWorld)
+
 		turnLock.Lock()
+		worldLock.Lock()
+		aliveCells = getAliveCellsCount(newWorld)
 		turn++
 		turnLock.Unlock()
+		worldLock.Unlock()
 		turnChannel <- turn
 
 		//Update alive cells
 		<-pauseChannel
-
-		flipWorldCellsIteration(inputWorld, newWorld, turn, p.ImageHeight, p.ImageHeight, c)
+		turnLock.Lock()
 		worldLock.Lock()
+		flipWorldCellsIteration(inputWorld, newWorld, turn, p.ImageHeight, p.ImageHeight, c)
 		inputWorld = newWorld
+		turnLock.Unlock()
 		worldLock.Unlock()
+
 	}
 
+	turnLock.Lock()
 	c.events <- FinalTurnComplete{turn, calculateAliveCells(inputWorld)}
+	turnLock.Unlock()
+
 	handleGameShutDown(inputWorld, p, p.Turns, c, aliveCellsTicker)
 }
