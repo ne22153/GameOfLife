@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"net/rpc"
+	"sync"
 	"time"
 	"uk.ac.bris.cs/gameoflife/Distributed/Shared"
 	"uk.ac.bris.cs/gameoflife/util"
@@ -149,7 +150,7 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 //Creates a strip for the worker and then the worker will perform GoL algorithm on such strip
 func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, stripSize int, imageWidth,
 	imageHeight,
-	workerNumber int, waitGroup *waitgroupDebug, req Shared.Request, res *Shared.Response,
+	workerNumber int, waitGroup *sync.WaitGroup, req Shared.Request, res *Shared.Response,
 	brokerRes *Shared.Response) {
 
 	req.World = createStrip(inputWorld, stripSize,
@@ -159,8 +160,7 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 		workerChannelList[workerNumber], workerNumber, brokerRes)
 
 	defer func() {
-		(*waitGroup).waitGroup.Done()
-		(*waitGroup).count--
+		(*waitGroup).Done()
 	}()
 }
 
@@ -219,6 +219,11 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 		Clients.clients[clientNum] = client
 		Clients.lock.Unlock()
 	}
+<<<<<<< HEAD
+=======
+
+	fmt.Println("Finishing worker ", clientNum+1)
+>>>>>>> 046b1e109ae27dc38c8f222b42a9c472e12bc1fc
 
 	return 0
 }

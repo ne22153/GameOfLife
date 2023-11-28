@@ -68,6 +68,7 @@ func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (e
 func (s *GoLOperations) KYS(*Shared.Request, *Shared.Response) (err error) {
 	fmt.Println("Terminated successfully")
 
+	time.Sleep(1 * time.Second)
 	defer os.Exit(0)
 	return
 
