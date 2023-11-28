@@ -60,7 +60,6 @@ type GoLOperations struct{}
 func (s *GoLOperations) GoLManager(req *Shared.Request, res *Shared.Response) (err error) {
 	condition.Add(1)
 	res.World = GoLWorker(req.World, req.Parameters)
-	fmt.Println("returning")
 	return
 }
 
@@ -99,7 +98,7 @@ func (s *GoLOperations) BackgroundManager(*Shared.Request, *Shared.Response) (er
 }
 
 func main() {
-	pAddr := flag.String("port", "8033", "Port to listen on")
+	pAddr := flag.String("port", "8030", "Port to listen on")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 	Shared.HandleRegisterAndError(&GoLOperations{})

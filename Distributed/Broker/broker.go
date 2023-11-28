@@ -127,7 +127,7 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 
 			waitGroup.waitGroup.Add(1)
 			waitGroup.count++
-			fmt.Println(waitGroup.count)
+
 			//We execute the workers concurrently
 			var request, response = createRequestResponsePair(req.Parameters, req.Events)
 			request.World = getCurrentWorld()
@@ -172,12 +172,10 @@ func (s *BrokerOperations) KYS(request Shared.Request, response *Shared.Response
 		i := i
 		Clients.lock.Lock()
 		Clients.owner = "KYS"
-		fmt.Println("CLAIMED by", Clients.owner)
 		go func() { HandleCallAndError(Clients.clients[i], Shared.SuicideHandler, &request, response, i, response) }()
 		Clients.lock.Unlock()
 	}
 	time.Sleep(1 * time.Second)
-	fmt.Println("Terminated Sucessfully")
 	os.Exit(0)
 	return
 }
@@ -190,7 +188,6 @@ func (s *BrokerOperations) PauseManager(request Shared.Request, response *Shared
 		request.Paused = !getPaused()
 		Clients.lock.Lock()
 		Clients.owner = "Broker Pause"
-		fmt.Println("CLAIMED by", Clients.owner)
 		go func() { HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &request, response, i, response) }()
 		Clients.lock.Unlock()
 	}
@@ -206,7 +203,6 @@ func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *S
 		i := i
 		Clients.lock.Lock()
 		Clients.owner = "Broker Background"
-		fmt.Println("CLAIMED by", Clients.owner)
 		go func() { HandleCallAndError(Clients.clients[i], Shared.PauseHandler, &request, response, i, response) }()
 		Clients.lock.Unlock()
 	}
@@ -222,7 +218,7 @@ func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *S
 func connectToWorkers() {
 	//This should be changed to AWS IPs when implemented beyond local machine
 	//clientsPorts = [4]string{"3.87.90.137:8030", "54.196.166.51:8030", "54.90.104.152:8030", "3.91.255.247:8030"}
-	clientsPorts = [4]string{"127.0.0.1:8031", "127.0.0.1:8032", "127.0.0.1:8033", "127.0.0.1:8034"}
+	clientsPorts = [4]string{"18.205.236.227:8030", "18.207.96.228:8030", "34.224.41.115:8030", "54.237.84.186:8030"}
 	var clientsConnections [4]*rpc.Client
 
 	//Initialize our clients
@@ -232,7 +228,6 @@ func connectToWorkers() {
 	}
 	Clients.lock.Lock()
 	Clients.owner = "Setup"
-	fmt.Println("CLAIMED by", Clients.owner)
 	Clients.clients = clientsConnections
 	Clients.lock.Unlock()
 }

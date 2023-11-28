@@ -22,7 +22,6 @@ func initializeWorkerStates(request *Shared.Request, response *Shared.Response, 
 			request.Paused = false
 			Clients.lock.Lock()
 			Clients.owner = "Broker manager"
-			fmt.Println("CLAIMED by", Clients.owner)
 			j := HandleCallAndError(Clients.clients[i], Shared.PauseHandler, request, response, i, brokerResponse)
 			Clients.lock.Unlock()
 			if j != 0 {
@@ -101,8 +100,6 @@ func distributeSliceSizes(p Shared.Params) []int {
 // creates the strip that the worker will operate on
 // currentHeight is pass by reference so that it will update for the next worker
 func createStrip(world [][]byte, stripSize int, workerNumber, imageHeight int) [][]byte {
-	//fmt.Println(stripSizeList)
-	//fmt.Println(workerNumber)
 	var topBuffer int
 	var endBuffer int
 	var startIndex int
@@ -143,16 +140,7 @@ func manager(req Shared.Request, res *Shared.Response, out chan<- [][]byte, clie
 	Clients.lock.Lock()
 	temp := Clients.clients[clientNum]
 	Clients.lock.Unlock()
-	/*Clients.owner = "manager"
-	fmt.Println("CLAIMED by", Clients.owner, clientNum+1)*/
-	var errorValue int = HandleCallAndError(temp, Shared.GoLHandler, &req, res, clientNum, brokerRes)
-
-	if errorValue != 0 {
-		fmt.Println("world:", res.World)
-		fmt.Println("Detected reconnection.")
-	} else {
-		fmt.Println("Released by manager ", clientNum+1)
-	}
+	HandleCallAndError(temp, Shared.GoLHandler, &req, res, clientNum, brokerRes)
 
 	return res.World
 }
@@ -212,17 +200,13 @@ func HandleCreateClientAndError(serverPort string) *rpc.Client {
 
 func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 	request *Shared.Request, response *Shared.Response, clientNum int, brokerRes *Shared.Response) int {
-	if namedFunctionHandler == Shared.GoLHandler {
-		fmt.Println("Sending to worker ", clientNum+1)
-	}
 	var namedFunctionHandlerError error
 
 	//This will essentially busy wait until a client is reconnected. Instead of handling the error, simply run it
-	//continously until there is no error
+	//continuously until there is no error
 	for {
 
 		namedFunctionHandlerError = client.Call(namedFunctionHandler, request, response)
-		fmt.Println(namedFunctionHandlerError)
 		//Escape hatch!
 		if namedFunctionHandlerError == nil {
 			break
@@ -232,12 +216,9 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 
 		Clients.lock.Lock()
 		Clients.owner = "Call and Error outer"
-		fmt.Println("CLAIMED by", Clients.owner)
 		Clients.clients[clientNum] = client
 		Clients.lock.Unlock()
 	}
-	
-	fmt.Println("Finishing worker ", clientNum+1)
 
 	return 0
 }
