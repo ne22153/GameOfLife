@@ -113,6 +113,7 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 	var waitGroup sync.WaitGroup
 	//var waitGroup sync.WaitGroup
 	var turn int
+	fmt.Println("Made it")
 
 	turn = initializeWorkerStates(&req, res, res, turn)
 
@@ -122,6 +123,7 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 	}
 	stripSizeList = distributeSliceSizes(req.Parameters)
 	for i := turn; i < req.Parameters.Turns; i++ {
+		fmt.Println("Calling")
 		//We now do split the input world for each thread accordingly
 		for j := 0; j < WORKERS; j++ {
 			waitGroup.Add(1)

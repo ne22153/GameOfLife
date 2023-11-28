@@ -37,6 +37,7 @@ func flipWorldCellsInitial(world [][]byte, imageHeight, imageWidth, turn int, c 
 
 //Main logic where we control all of our AWS nodes. Also controls the ticker and keypress logic as well.
 func controller(params Shared.Params, channels DistributorChannels, keyPresses <-chan rune) {
+	fmt.Println("I have been beckoned")
 	var client = Shared.HandleCreateClientAndError(params.ServerPort)
 	Channels = channels
 
