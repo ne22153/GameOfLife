@@ -17,6 +17,7 @@ const DEAD = 0
 const BUFFER = 2
 
 var worldLock sync.Mutex
+var turnLock sync.Mutex
 
 type distributorChannels struct {
 	events    chan<- Event
@@ -33,7 +34,7 @@ func calculateAliveCells(world [][]byte) []util.Cell {
 	var coordinates []util.Cell
 	worldLock.Lock()
 	rows := world
-	worldLock.Unlock()
+
 	for index, row := range rows {
 		for index2 := range row {
 			if world[index][index2] > 0 {
@@ -41,6 +42,7 @@ func calculateAliveCells(world [][]byte) []util.Cell {
 			}
 		}
 	}
+	worldLock.Unlock()
 	return coordinates
 }
 
@@ -137,8 +139,9 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 	aliveCells := 0
 
 	worldLock.Lock()
+	turnLock.Lock()
 	rows := inputWorld
-	worldLock.Unlock()
+
 	for _, row := range rows {
 		for _, tile := range row {
 			if tile == LIVE {
@@ -146,7 +149,8 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 			}
 		}
 	}
-
+	turnLock.Unlock()
+	worldLock.Unlock()
 	return aliveCells
 }
 
@@ -196,7 +200,11 @@ func aliveCellsReporter(turn, aliveCells *int, ticker *time.Ticker, c distributo
 	for {
 		select {
 		case <-ticker.C:
+			worldLock.Lock()
+			turnLock.Lock()
 			c.events <- AliveCellsCount{*turn, *aliveCells}
+			turnLock.Unlock()
+			worldLock.Unlock()
 		}
 	}
 }
@@ -313,7 +321,9 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			worldLock.Unlock()
 		}
 		aliveCells = getAliveCellsCount(newWorld)
+		turnLock.Lock()
 		turn++
+		turnLock.Unlock()
 		turnChannel <- turn
 
 		//Update alive cells
