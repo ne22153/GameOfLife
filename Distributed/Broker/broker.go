@@ -219,7 +219,7 @@ func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *S
 func connectToWorkers() {
 	//This should be changed to AWS IPs when implemented beyond local machine
 	//clientsPorts = [4]string{"3.87.90.137:8030", "54.196.166.51:8030", "54.90.104.152:8030", "3.91.255.247:8030"}
-	clientsPorts = [4]string{"18.205.236.227:8030", "18.207.96.228:8030", "34.224.41.115:8030", "54.237.84.186:8030"}
+	clientsPorts = [4]string{"44.212.2.115:8030", "54.91.113.34:8030", "52.5.124.138:8030", "54.174.69.233:8030"}
 	var clientsConnections [4]*rpc.Client
 
 	//Initialize our clients
