@@ -219,11 +219,6 @@ func HandleCallAndError(client *rpc.Client, namedFunctionHandler string,
 		Clients.clients[clientNum] = client
 		Clients.lock.Unlock()
 	}
-<<<<<<< HEAD
-=======
-
-	fmt.Println("Finishing worker ", clientNum+1)
->>>>>>> 046b1e109ae27dc38c8f222b42a9c472e12bc1fc
 
 	return 0
 }
