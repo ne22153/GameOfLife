@@ -122,6 +122,7 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 	imageHeight,
 	threads,
 	workerNumber int, waitGroup *sync.WaitGroup) {
+
 	var strip = createStrip(inputWorld, stripSizeList,
 		workerNumber, imageHeight, threads)
 	var workerStripSize = (stripSizeList[workerNumber]) + BUFFER
@@ -194,25 +195,22 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 				}
 
 			} else if key == 'q' {
-				//When q is pressed, generate a PGM file with the current state of the board then terminate
-				//resourceLock.Lock()
-				//inputWorldCopy
-				// := copy(inital)
-				//resourceLock.Unlock()
 
-				//resourceLock.Lock()
 				resourceLock.Lock()
 				inputWorldImmutable := copyWordImmutable(inputWorld)
+				turnsImmutable := turns
 				resourceLock.Unlock()
 
-				handleGameShutDown(inputWorldImmutable, p, turns, c, aliveCellsTicker)
+				handleGameShutDown(inputWorldImmutable, p, turnsImmutable, c, aliveCellsTicker)
 				//resourceLock.Unlock()
 				//Exit the program
 				os.Exit(0)
 			}
 		//When turn is incremented, we're informed of the change
 		case t := <-turn:
+			resourceLock.Lock()
 			turns = t
+			resourceLock.Unlock()
 			if !paused {
 				pauseChannel <- true
 			}
@@ -231,9 +229,9 @@ func aliveCellsReporter(turn, aliveCells *int, ticker *time.Ticker, c distributo
 			t := *turn
 			a := *aliveCells
 			resourceLock.Unlock()
-			//resourceLock.Lock()
+
 			c.events <- AliveCellsCount{t, a}
-			//resourceLock.Unlock()
+
 		}
 	}
 }
@@ -292,9 +290,12 @@ func handleGameShutDown(world [][]byte, p Params, turns int, c distributorChanne
 	<-c.ioIdle
 
 	c.events <- StateChange{turns, Quitting}
-	ticker.Stop()
+
 	//Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
+	resourceLock.Lock()
+	ticker.Stop()
 	close(c.events)
+	resourceLock.Unlock()
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
@@ -335,11 +336,16 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 				var workerChannel = make(chan [][]byte, 2)
 				workerChannelList[j] = workerChannel
 			}
+
+			resourceLock.Lock()
+			inputWorldImmutable := copyWordImmutable(inputWorld)
+			resourceLock.Unlock()
+
 			//We now do split the input world for each thread accordingly
 			for j := 0; j < p.Threads; j++ {
 				waitGroup.Add(1)
 				//We execute the workers concurrently
-				go executeWorker(inputWorld, workerChannelList,
+				go executeWorker(inputWorldImmutable, workerChannelList,
 					stripSizeList, p.ImageHeight, p.ImageWidth, p.Threads, j,
 					&waitGroup)
 			}
@@ -362,6 +368,16 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		inputWorld = newWorld
 	}
 
-	c.events <- FinalTurnComplete{turn, calculateAliveCells(inputWorld)}
-	handleGameShutDown(inputWorld, p, p.Turns, c, aliveCellsTicker)
+	//Guarantee of safety
+	resourceLock.Lock()
+	inputWorldImmutableEnd := copyWordImmutable(inputWorld)
+	turnImmutable := turn
+	resourceLock.Unlock()
+
+	//fmt.Println("printing world rn")
+	//fmt.Println(len(inputWorldImmutableEnd))
+	//fmt.Println(turnImmutable)
+	//fmt.Println(getAliveCellsCount(inputWorldImmutableEnd))
+	c.events <- FinalTurnComplete{turnImmutable, calculateAliveCells(inputWorldImmutableEnd)}
+	handleGameShutDown(inputWorldImmutableEnd, p, p.Turns, c, aliveCellsTicker)
 }

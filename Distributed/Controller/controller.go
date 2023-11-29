@@ -55,7 +55,7 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 	Shared.HandleCallAndError(client, Shared.BrokerHandler, &request, response)
 
 	resourceLock.Lock()
-	immuableFinalWorld := copyWordImmutable(response.World)
+	immuableFinalWorld := CopyWorldImmutable(response.World)
 	resourceLock.Unlock()
 
 	channels.events <- Shared.FinalTurnComplete{

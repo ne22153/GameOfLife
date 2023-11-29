@@ -34,7 +34,7 @@ func getPaused() bool {
 }
 
 //Cited from: https://stackoverflow.com/questions/45465368/golang-multidimensional-slice-copy
-func copyWordImmutable(world [][]byte) [][]byte {
+func CopyWorldImmutable(world [][]byte) [][]byte {
 	var immutableWorldCopy [][]byte = make([][]byte, len(world))
 	for i := range world {
 		immutableWorldCopy[i] = make([]byte, len(world[i]))
@@ -64,7 +64,7 @@ func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels,
 	c.events <- Shared.AliveCellsCount{CompletedTurns: 0, CellsCount: 0}
 
 	resourceLock.Lock()
-	worldImmutableCopy := copyWordImmutable(request.World)
+	worldImmutableCopy := CopyWorldImmutable(request.World)
 	resourceLock.Unlock()
 	flipWorldCellsInitial(worldImmutableCopy, request.Parameters.ImageHeight, request.Parameters.ImageWidth, 0, c)
 	currentWorld := worldImmutableCopy
@@ -108,6 +108,7 @@ func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels,
 				resourceLock.Lock()
 				currentWorld = response.World
 				resourceLock.Unlock()
+
 			}
 		}
 	}
@@ -168,7 +169,7 @@ func handleGameShutDown(client *rpc.Client, response *Shared.Response,
 	var filename = strconv.Itoa(p.ImageWidth) + "x" +
 		strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(p.Turns)
 
-	var immutableWorldCopy [][]byte = copyWordImmutable(response.World)
+	var immutableWorldCopy [][]byte = CopyWorldImmutable(response.World)
 
 	writeToFileIO(immutableWorldCopy, p, filename, c)
 	shutDownIOTickerClient(c, ticker, client)
@@ -201,18 +202,28 @@ func determineKeyPress(client *rpc.Client, keyPresses <-chan rune,
 				os.Exit(0)
 			} else if key == 's' {
 				Shared.HandleCallAndError(client, Shared.BrokerInfo, req, res)
+
+				resourceLock.Lock()
+				turnsImmutable := res.Turns
+				responseWorldImmutable := CopyWorldImmutable(res.World)
+				resourceLock.Unlock()
+
 				var filename = strconv.Itoa(req.Parameters.ImageWidth) + "x" +
 					strconv.Itoa(req.Parameters.ImageHeight) + "x" +
-					strconv.Itoa(res.Turns)
-				writeToFileIO(res.World, req.Parameters, filename, c)
+					strconv.Itoa(turnsImmutable)
+				writeToFileIO(responseWorldImmutable, req.Parameters, filename, c)
 			} else if key == 'p' {
 				fmt.Println("Continuing")
 				Shared.HandleCallAndError(client, Shared.BrokerPause, req, res)
 				changePaused()
 			} else if key == 'q' {
-				Shared.HandleCallAndError(client, Shared.BrokerBackground, req, res)
-				Shared.HandleCallAndError(client, Shared.BrokerInfo, req, res)
-				shutDownIOTickerClient(c, ticker, client)
+				go func() {
+					Shared.HandleCallAndError(client, Shared.BrokerBackground, req, res)
+					Shared.HandleCallAndError(client, Shared.BrokerInfo, req, res)
+					shutDownIOTickerClient(c, ticker, client)
+				}()
+				time.Sleep(1 * time.Second)
+				fmt.Println("Terminated controller sucessfully")
 				os.Exit(0)
 			}
 		}
