@@ -1,12 +1,23 @@
 goos: linux
 goarch: amd64
 pkg: uk.ac.bris.cs/gameoflife
-cpu: 11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz
+cpu: AMD Ryzen 7 5700X 8-Core Processor             
 ,results.out
 ,sec/op,CI
-Filter/1_workers-8,4.698536958,∞
-Filter/2_workers-8,2.9335022200000003,∞
-Filter/4_workers-8,2.462841063,∞
-Filter/8_workers-8,2.227786224,∞
-Filter/16_workers-8,2.2174336940000003,∞
-geomean,2.7854920429239836
+Filter/1_workers-16,3.4277997535000004,5%
+Filter/2_workers-16,2.7280159925,1%
+Filter/3_workers-16,2.270173882,1%
+Filter/4_workers-16,2.0533938505,2%
+Filter/5_workers-16,1.875061284,2%
+Filter/6_workers-16,1.7463552230000001,2%
+Filter/7_workers-16,1.6860726270000002,3%
+Filter/8_workers-16,1.687561799,1%
+Filter/9_workers-16,1.5774237815,2%
+Filter/10_workers-16,1.6530190665000002,2%
+Filter/11_workers-16,1.5835694990000002,1%
+Filter/12_workers-16,1.5617524425,2%
+Filter/13_workers-16,1.5669484125,1%
+Filter/14_workers-16,1.5714094800000002,3%
+Filter/15_workers-16,1.5844432515000002,4%
+Filter/16_workers-16,1.631578824,2%
+geomean,1.836005101769191
