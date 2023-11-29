@@ -1,6 +1,5 @@
 //Example useage:
 //go test -run a$ -bench BenchmarkStudentVersion/512x512x1000-1 -timeout 100s -cpuprofile cpu.prof
-
 package main
 
 import (
@@ -14,6 +13,8 @@ import (
 const benchLength = 1000
 
 func BenchmarkStudentVersion(b *testing.B) {
+
+	//we go through from 1- 16 threads
 	for threads := 1; threads <= 16; threads++ {
 		os.Stdout = nil // Disable all program output apart from benchmark results
 		p := gol.Params{
