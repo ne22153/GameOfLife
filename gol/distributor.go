@@ -29,6 +29,8 @@ type distributorChannels struct {
 	ioInput    <-chan byte
 }
 
+var resourceLock sync.Mutex
+
 //Helper function to distributor to find the number of alive cells adjacent to the tile
 func calculateAliveCells(world [][]byte) []util.Cell {
 	var coordinates []util.Cell
@@ -127,6 +129,7 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 	imageHeight,
 	threads,
 	workerNumber int, waitGroup *sync.WaitGroup) {
+
 	var strip = createStrip(inputWorld, stripSizeList,
 		workerNumber, imageHeight, threads)
 	var workerStripSize = (stripSizeList[workerNumber]) + BUFFER
@@ -154,6 +157,22 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 	return aliveCells
 }
 
+//Cited from: https://stackoverflow.com/questions/45465368/golang-multidimensional-slice-copy
+//Takes some mutable reference of a world and then makes an immutable copy
+func copyWordImmutable(world [][]byte) [][]byte {
+	var immutableWorldCopy [][]byte = make([][]byte, len(world))
+	for i := range world {
+		immutableWorldCopy[i] = make([]byte, len(world[i]))
+		for j := range world[i] {
+			immutableWorldCopy[i][j] = world[i][j]
+		}
+	}
+
+	return immutableWorldCopy
+}
+
+//end of citation
+
 //Manages the key press interrupts
 func goPressTrack(inputWorld *[][]byte, keyPresses <-chan rune, c distributorChannels, p Params, turn chan int,
 	aliveCellsTicker *time.Ticker, pauseChannel chan bool) {
@@ -167,7 +186,14 @@ func goPressTrack(inputWorld *[][]byte, keyPresses <-chan rune, c distributorCha
 
 				var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.
 					Itoa(turns)
-				writeToFileIO(*inputWorld, p, filename, c)
+
+				//resourceLock.Lock()
+				resourceLock.Lock()
+				inputWorldImmutable := copyWordImmutable(*inputWorld)
+				resourceLock.Unlock()
+
+				writeToFileIO(inputWorldImmutable, p, filename, c)
+				//resourceLock.Unlock()
 			} else if key == 'p' {
 				//When p is pressed, pause the processing and print the current turn that is being processed
 				//If p is pressed again resume the processing
@@ -181,14 +207,22 @@ func goPressTrack(inputWorld *[][]byte, keyPresses <-chan rune, c distributorCha
 				}
 
 			} else if key == 'q' {
-				//When q is pressed, generate a PGM file with the current state of the board then terminate
-				handleGameShutDown(*inputWorld, p, turns, c, aliveCellsTicker)
+
+				resourceLock.Lock()
+				inputWorldImmutable := copyWordImmutable(*inputWorld)
+				turnsImmutable := turns
+				resourceLock.Unlock()
+
+				handleGameShutDown(inputWorldImmutable, p, turnsImmutable, c, aliveCellsTicker)
+				//resourceLock.Unlock()
 				//Exit the program
 				os.Exit(0)
 			}
 		//When turn is incremented, we're informed of the change
 		case t := <-turn:
+			resourceLock.Lock()
 			turns = t
+			resourceLock.Unlock()
 			if !paused {
 				pauseChannel <- true
 			}
@@ -200,11 +234,15 @@ func aliveCellsReporter(turn, aliveCells *int, ticker *time.Ticker, c distributo
 	for {
 		select {
 		case <-ticker.C:
-			worldLock.Lock()
-			turnLock.Lock()
-			c.events <- AliveCellsCount{*turn, *aliveCells}
-			turnLock.Unlock()
-			worldLock.Unlock()
+
+			//We make an immutable copy of a mutable reference such that this prevents deadlocks
+			//Just accept it works
+			resourceLock.Lock()
+			t := *turn
+			a := *aliveCells
+			resourceLock.Unlock()
+
+			c.events <- AliveCellsCount{t, a}
 		}
 	}
 }
@@ -263,9 +301,12 @@ func handleGameShutDown(world [][]byte, p Params, turns int, c distributorChanne
 	<-c.ioIdle
 
 	c.events <- StateChange{turns, Quitting}
-	ticker.Stop()
+
 	//Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
+	resourceLock.Lock()
+	ticker.Stop()
 	close(c.events)
+	resourceLock.Unlock()
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
@@ -306,24 +347,30 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 				var workerChannel = make(chan [][]byte, 2)
 				workerChannelList[j] = workerChannel
 			}
+
+			resourceLock.Lock()
+			inputWorldImmutable := copyWordImmutable(inputWorld)
+			resourceLock.Unlock()
+
 			//We now do split the input world for each thread accordingly
 			for j := 0; j < p.Threads; j++ {
 				waitGroup.Add(1)
 				//We execute the workers concurrently
-				go executeWorker(inputWorld, workerChannelList,
+				go executeWorker(inputWorldImmutable, workerChannelList,
 					stripSizeList, p.ImageHeight, p.ImageWidth, p.Threads, j,
 					&waitGroup)
 			}
 			waitGroup.Wait()
 
-			worldLock.Lock()
+			resourceLock.Lock()
 			newWorld = mergeWorkerStrips(newWorld, workerChannelList, stripSizeList)
-			worldLock.Unlock()
+			resourceLock.Unlock()
 		}
+		resourceLock.Lock()
 		aliveCells = getAliveCellsCount(newWorld)
 		turnLock.Lock()
 		turn++
-		turnLock.Unlock()
+		resourceLock.Unlock()
 		turnChannel <- turn
 
 		//Update alive cells
@@ -335,6 +382,16 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		worldLock.Unlock()
 	}
 
-	c.events <- FinalTurnComplete{turn, calculateAliveCells(inputWorld)}
-	handleGameShutDown(inputWorld, p, p.Turns, c, aliveCellsTicker)
+	//Guarantee of safety
+	resourceLock.Lock()
+	inputWorldImmutableEnd := copyWordImmutable(inputWorld)
+	turnImmutable := turn
+	resourceLock.Unlock()
+
+	//fmt.Println("printing world rn")
+	//fmt.Println(len(inputWorldImmutableEnd))
+	//fmt.Println(turnImmutable)
+	//fmt.Println(getAliveCellsCount(inputWorldImmutableEnd))
+	c.events <- FinalTurnComplete{turnImmutable, calculateAliveCells(inputWorldImmutableEnd)}
+	handleGameShutDown(inputWorldImmutableEnd, p, p.Turns, c, aliveCellsTicker)
 }

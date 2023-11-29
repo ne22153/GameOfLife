@@ -32,7 +32,9 @@ func flipWorldCellsInitial(world [][]byte, imageHeight, imageWidth, turn int, c 
 			}
 		}
 	}
+	resourceLock.Lock()
 	c.events <- Shared.TurnComplete{CompletedTurns: 0}
+	resourceLock.Unlock()
 }
 
 //Main logic where we control all of our AWS nodes. Also controls the ticker and keypress logic as well.
@@ -52,12 +54,17 @@ func controller(params Shared.Params, channels DistributorChannels, keyPresses <
 
 	//We set up our broker
 	Shared.HandleCallAndError(client, Shared.BrokerHandler, &request, response)
+
+	resourceLock.Lock()
+	immuableFinalWorld := CopyWorldImmutable(response.World)
+	resourceLock.Unlock()
+
 	channels.events <- Shared.FinalTurnComplete{
 		CompletedTurns: params.Turns,
-		Alive:          calculateAliveCells(response.World)}
+		Alive:          calculateAliveCells(immuableFinalWorld)}
 	//Shut down the game safely
 
-	defer handleGameShutDown(client, response, params, channels, ticker)
+	handleGameShutDown(client, response, params, channels, ticker)
 }
 
 func main() {
