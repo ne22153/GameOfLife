@@ -16,6 +16,9 @@ const DEAD = 0
 // BUFFER We make a const for a buffer size stand in
 const BUFFER = 2
 
+var worldLock sync.Mutex
+var turnLock sync.Mutex
+
 type distributorChannels struct {
 	events    chan<- Event
 	ioCommand chan<- ioCommand
@@ -31,13 +34,17 @@ var resourceLock sync.Mutex
 //Helper function to distributor to find the number of alive cells adjacent to the tile
 func calculateAliveCells(world [][]byte) []util.Cell {
 	var coordinates []util.Cell
-	for index, row := range world {
+	worldLock.Lock()
+	rows := world
+
+	for index, row := range rows {
 		for index2 := range row {
 			if world[index][index2] > 0 {
 				coordinates = append(coordinates, util.Cell{X: index2, Y: index})
 			}
 		}
 	}
+	worldLock.Unlock()
 	return coordinates
 }
 
@@ -134,14 +141,19 @@ func executeWorker(inputWorld [][]byte, workerChannelList []chan [][]byte, strip
 func getAliveCellsCount(inputWorld [][]byte) int {
 	aliveCells := 0
 
-	for _, row := range inputWorld {
+	worldLock.Lock()
+	turnLock.Lock()
+	rows := inputWorld
+
+	for _, row := range rows {
 		for _, tile := range row {
 			if tile == LIVE {
 				aliveCells++
 			}
 		}
 	}
-
+	turnLock.Unlock()
+	worldLock.Unlock()
 	return aliveCells
 }
 
@@ -231,7 +243,6 @@ func aliveCellsReporter(turn, aliveCells *int, ticker *time.Ticker, c distributo
 			resourceLock.Unlock()
 
 			c.events <- AliveCellsCount{t, a}
-
 		}
 	}
 }
@@ -357,6 +368,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		}
 		resourceLock.Lock()
 		aliveCells = getAliveCellsCount(newWorld)
+		turnLock.Lock()
 		turn++
 		resourceLock.Unlock()
 		turnChannel <- turn
@@ -365,7 +377,9 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		<-pauseChannel
 
 		flipWorldCellsIteration(inputWorld, newWorld, turn, p.ImageHeight, p.ImageHeight, c)
+		worldLock.Lock()
 		inputWorld = newWorld
+		worldLock.Unlock()
 	}
 
 	//Guarantee of safety
