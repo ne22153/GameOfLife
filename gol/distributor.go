@@ -155,7 +155,7 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 }
 
 //Manages the key press interrupts
-func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChannels, p Params, turn chan int,
+func goPressTrack(inputWorld *[][]byte, keyPresses <-chan rune, c distributorChannels, p Params, turn chan int,
 	aliveCellsTicker *time.Ticker, pauseChannel chan bool) {
 	var turns = 0
 	var paused = false
@@ -167,7 +167,7 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 
 				var filename = strconv.Itoa(p.ImageWidth) + "x" + strconv.Itoa(p.ImageHeight) + "x" + strconv.
 					Itoa(turns)
-				writeToFileIO(inputWorld, p, filename, c)
+				writeToFileIO(*inputWorld, p, filename, c)
 			} else if key == 'p' {
 				//When p is pressed, pause the processing and print the current turn that is being processed
 				//If p is pressed again resume the processing
@@ -182,7 +182,7 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 
 			} else if key == 'q' {
 				//When q is pressed, generate a PGM file with the current state of the board then terminate
-				handleGameShutDown(inputWorld, p, turns, c, aliveCellsTicker)
+				handleGameShutDown(*inputWorld, p, turns, c, aliveCellsTicker)
 				//Exit the program
 				os.Exit(0)
 			}
@@ -288,7 +288,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	var turnChannel = make(chan int)
 	var pauseChannel = make(chan bool)
 	//Keep track of any key presses by the user
-	go goPressTrack(inputWorld, keyPresses, c, p, turnChannel, aliveCellsTicker, pauseChannel)
+	go goPressTrack(&inputWorld, keyPresses, c, p, turnChannel, aliveCellsTicker, pauseChannel)
 
 	//We flip the cells
 	flipWorldCellsInitial(inputWorld, p.ImageHeight, p.ImageWidth, turn, c)

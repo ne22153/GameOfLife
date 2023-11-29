@@ -123,7 +123,7 @@ func (s *BrokerOperations) GoLManager(req Shared.Request, res *Shared.Response) 
 	}
 	stripSizeList = distributeSliceSizes(req.Parameters)
 	for i := turn; i < req.Parameters.Turns; i++ {
-		fmt.Println("Calling")
+		//fmt.Println("Calling")
 		//We now do split the input world for each thread accordingly
 		for j := 0; j < WORKERS; j++ {
 			waitGroup.Add(1)
@@ -219,7 +219,8 @@ func (s *BrokerOperations) BackgroundManager(request Shared.Request, response *S
 func connectToWorkers() {
 	//This should be changed to AWS IPs when implemented beyond local machine
 	//clientsPorts = [4]string{"3.87.90.137:8030", "54.196.166.51:8030", "54.90.104.152:8030", "3.91.255.247:8030"}
-	clientsPorts = [4]string{"44.212.2.115:8030", "54.91.113.34:8030", "52.5.124.138:8030", "54.174.69.233:8030"}
+	//clientsPorts = [4]string{"44.212.2.115:8030", "54.91.113.34:8030", "52.5.124.138:8030", "54.174.69.233:8030"}
+	clientsPorts = [4]string{"127.0.0.1:8031", "127.0.0.1:8032", "127.0.0.1:8033", "127.0.0.1:8034"}
 	var clientsConnections [4]*rpc.Client
 
 	//Initialize our clients
