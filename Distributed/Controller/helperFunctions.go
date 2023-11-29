@@ -16,6 +16,8 @@ type pauseStruct struct {
 	lock  sync.Mutex
 }
 
+//This resource lock is used so that we can make immutable copies of mutable references (prevent data race)
+var resourceLock sync.Mutex
 var paused pauseStruct
 
 func changePaused() {
@@ -31,29 +33,81 @@ func getPaused() bool {
 	return temp
 }
 
+//Cited from: https://stackoverflow.com/questions/45465368/golang-multidimensional-slice-copy
+func copyWordImmutable(world [][]byte) [][]byte {
+	var immutableWorldCopy [][]byte = make([][]byte, len(world))
+	for i := range world {
+		immutableWorldCopy[i] = make([]byte, len(world[i]))
+		for j := range world[i] {
+			immutableWorldCopy[i][j] = world[i][j]
+		}
+	}
+
+	return immutableWorldCopy
+}
+
+//end of citation
+
+func makeFlippedCellDeepCopy(flippedCellsRow []util.Cell) []util.Cell {
+	var immutableFlippedCells []util.Cell = make([]util.Cell, len(flippedCellsRow))
+	for i := range flippedCellsRow {
+		//A util.Cell only contains primitive fields (ints) so this will safely make a deep copy (good)
+		immutableFlippedCells[i] = flippedCellsRow[i]
+	}
+	return immutableFlippedCells
+}
+
 //Helper function of controller
 //Performs necessary logic in order to handle the ticker
 func aliveCellsReporter(ticker *time.Ticker, c DistributorChannels,
 	client *rpc.Client, request Shared.Request, response *Shared.Response) {
 	c.events <- Shared.AliveCellsCount{CompletedTurns: 0, CellsCount: 0}
-	flipWorldCellsInitial(request.World, request.Parameters.ImageHeight, request.Parameters.ImageWidth, 0, c)
-	currentWorld := request.World
+
+	resourceLock.Lock()
+	worldImmutableCopy := copyWordImmutable(request.World)
+	resourceLock.Unlock()
+	flipWorldCellsInitial(worldImmutableCopy, request.Parameters.ImageHeight, request.Parameters.ImageWidth, 0, c)
+	currentWorld := worldImmutableCopy
 	for {
 		select {
 		//When the ticker triggers,
 		//we send an RPC call to return the number of alive cells, and number of turns processed
 		case <-ticker.C:
+
+			resourceLock.Lock()
 			request.World = currentWorld
+			resourceLock.Unlock()
+
 			Shared.HandleCallAndError(client, Shared.BrokerInfo, &request, response)
+
+			//We make our immutable copies here
+			resourceLock.Lock()
+			turnsImmutable := response.Turns
+			aliveCellsImmutable := response.AliveCells
+			flippedCellsImmutable := makeFlippedCellDeepCopy(response.FlippedCells)
+			resourceLock.Unlock()
+
 			c.events <- Shared.AliveCellsCount{
-				CompletedTurns: response.Turns,
-				CellsCount:     response.AliveCells}
+				CompletedTurns: turnsImmutable,
+				CellsCount:     aliveCellsImmutable}
+
 			if !getPaused() {
-				for i := 0; i < len(response.FlippedCells); i++ {
-					c.events <- Shared.CellFlipped{CompletedTurns: response.Turns, Cell: response.FlippedCells[i]}
+				for i := 0; i < len(flippedCellsImmutable); i++ {
+
+					//make immutable copies
+					resourceLock.Lock()
+
+					//util cell only has privitive fields, therefore this is a deep copy
+					var flippedCellImmutable util.Cell = flippedCellsImmutable[i]
+
+					resourceLock.Unlock()
+					c.events <- Shared.CellFlipped{CompletedTurns: turnsImmutable, Cell: flippedCellImmutable}
 				}
-				c.events <- Shared.TurnComplete{CompletedTurns: response.Turns}
+				c.events <- Shared.TurnComplete{CompletedTurns: turnsImmutable}
+
+				resourceLock.Lock()
 				currentWorld = response.World
+				resourceLock.Unlock()
 			}
 		}
 	}
@@ -91,8 +145,10 @@ func createRequestResponsePair(p Shared.Params, c DistributorChannels) (Shared.R
 //Helper function to controller
 //Handles necessary logic for closing the client neatly and successfully
 func handleCloseClient(client *rpc.Client) {
+
 	closeError := client.Close()
 	Shared.HandleError(closeError)
+
 }
 
 //General helper function
@@ -111,9 +167,16 @@ func handleGameShutDown(client *rpc.Client, response *Shared.Response,
 	p Shared.Params, c DistributorChannels, ticker *time.Ticker) {
 	var filename = strconv.Itoa(p.ImageWidth) + "x" +
 		strconv.Itoa(p.ImageHeight) + "x" + strconv.Itoa(p.Turns)
-	writeToFileIO(response.World, p, filename, c)
+
+	var immutableWorldCopy [][]byte = copyWordImmutable(response.World)
+
+	writeToFileIO(immutableWorldCopy, p, filename, c)
 	shutDownIOTickerClient(c, ticker, client)
+
+	//closing events
+	resourceLock.Lock()
 	close(c.events)
+	resourceLock.Unlock()
 	//os.Exit(0)
 }
 

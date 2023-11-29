@@ -144,6 +144,22 @@ func getAliveCellsCount(inputWorld [][]byte) int {
 	return aliveCells
 }
 
+//Cited from: https://stackoverflow.com/questions/45465368/golang-multidimensional-slice-copy
+//Takes some mutable reference of a world and then makes an immutable copy
+func copyWordImmutable(world [][]byte) [][]byte {
+	var immutableWorldCopy [][]byte = make([][]byte, len(world))
+	for i := range world {
+		immutableWorldCopy[i] = make([]byte, len(world[i]))
+		for j := range world[i] {
+			immutableWorldCopy[i][j] = world[i][j]
+		}
+	}
+
+	return immutableWorldCopy
+}
+
+//end of citation
+
 //Manages the key press interrupts
 func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChannels, p Params, turn chan int,
 	aliveCellsTicker *time.Ticker, pauseChannel chan bool) {
@@ -159,7 +175,11 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 					Itoa(turns)
 
 				//resourceLock.Lock()
-				writeToFileIO(inputWorld, p, filename, c)
+				resourceLock.Lock()
+				inputWorldImmutable := copyWordImmutable(inputWorld)
+				resourceLock.Unlock()
+
+				writeToFileIO(inputWorldImmutable, p, filename, c)
 				//resourceLock.Unlock()
 			} else if key == 'p' {
 				//When p is pressed, pause the processing and print the current turn that is being processed
@@ -181,7 +201,11 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 				//resourceLock.Unlock()
 
 				//resourceLock.Lock()
-				handleGameShutDown(inputWorld, p, turns, c, aliveCellsTicker)
+				resourceLock.Lock()
+				inputWorldImmutable := copyWordImmutable(inputWorld)
+				resourceLock.Unlock()
+
+				handleGameShutDown(inputWorldImmutable, p, turns, c, aliveCellsTicker)
 				//resourceLock.Unlock()
 				//Exit the program
 				os.Exit(0)
