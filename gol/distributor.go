@@ -364,8 +364,10 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		//Update alive cells
 		<-pauseChannel
 
+		resourceLock.Lock()
 		flipWorldCellsIteration(inputWorld, newWorld, turn, p.ImageHeight, p.ImageHeight, c)
 		inputWorld = newWorld
+		resourceLock.Unlock()
 	}
 
 	//Guarantee of safety

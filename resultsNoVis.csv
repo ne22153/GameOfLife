@@ -1,0 +1,23 @@
+goos: linux
+goarch: amd64
+pkg: uk.ac.bris.cs/gameoflife
+cpu: AMD Ryzen 7 5700X 8-Core Processor             
+,resultsNoVis.out
+,sec/op,CI
+Filter/1_workers-16,3.4296318185,3%
+Filter/2_workers-16,2.7123647655000003,2%
+Filter/3_workers-16,2.260318691,2%
+Filter/4_workers-16,2.0164805315,1%
+Filter/5_workers-16,1.854565151,1%
+Filter/6_workers-16,1.7362336255000002,1%
+Filter/7_workers-16,1.66352397,2%
+Filter/8_workers-16,1.6487953560000002,5%
+Filter/9_workers-16,1.5843831080000002,2%
+Filter/10_workers-16,1.6201161305,1%
+Filter/11_workers-16,1.5775613895,1%
+Filter/12_workers-16,1.5376445170000002,1%
+Filter/13_workers-16,1.5626756305000002,2%
+Filter/14_workers-16,1.5271631305,1%
+Filter/15_workers-16,1.5798547825,3%
+Filter/16_workers-16,1.5575320525,1%
+geomean,1.81354734698731
