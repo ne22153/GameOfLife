@@ -162,7 +162,7 @@ func copyWordImmutable(world [][]byte) [][]byte {
 //end of citation
 
 //Manages the key press interrupts
-func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChannels, p Params, turn chan int,
+func goPressTrack(inputWorld *[][]byte, keyPresses <-chan rune, c distributorChannels, p Params, turn chan int,
 	aliveCellsTicker *time.Ticker, pauseChannel chan bool) {
 	var turns = 0
 	var paused = false
@@ -177,7 +177,7 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 
 				//resourceLock.Lock()
 				resourceLock.Lock()
-				inputWorldImmutable := copyWordImmutable(inputWorld)
+				inputWorldImmutable := copyWordImmutable(*inputWorld)
 				resourceLock.Unlock()
 
 				writeToFileIO(inputWorldImmutable, p, filename, c)
@@ -197,7 +197,7 @@ func goPressTrack(inputWorld [][]byte, keyPresses <-chan rune, c distributorChan
 			} else if key == 'q' {
 
 				resourceLock.Lock()
-				inputWorldImmutable := copyWordImmutable(inputWorld)
+				inputWorldImmutable := copyWordImmutable(*inputWorld)
 				turnsImmutable := turns
 				resourceLock.Unlock()
 
@@ -318,7 +318,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	var turnChannel = make(chan int)
 	var pauseChannel = make(chan bool)
 	//Keep track of any key presses by the user
-	go goPressTrack(inputWorld, keyPresses, c, p, turnChannel, aliveCellsTicker, pauseChannel)
+	go goPressTrack(&inputWorld, keyPresses, c, p, turnChannel, aliveCellsTicker, pauseChannel)
 
 	//We flip the cells
 	flipWorldCellsInitial(inputWorld, p.ImageHeight, p.ImageWidth, turn, c)
