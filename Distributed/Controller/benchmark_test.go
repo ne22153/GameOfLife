@@ -16,7 +16,7 @@ func BenchmarkFilter(b *testing.B) {
 	// Use a for-loop to run 5 sub-benchmarks, with 1, 2, 4, 8 and 16 workers.
 	for threads := 1; threads <= 1; threads *= 2 {
 		b.Run(fmt.Sprintf("%d_workers", threads), func(b *testing.B) {
-			for i := 0; i < 1; i++ {
+			for i := 0; i < b.N; i++ {
 
 				params := Shared.Params{
 					Turns:       1000,
